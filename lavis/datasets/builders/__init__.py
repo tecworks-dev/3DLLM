@@ -38,6 +38,8 @@ from lavis.datasets.builders.retrieval_builder import (
 )
 from lavis.datasets.builders.dialogue_builder import AVSDDialBuilder
 
+from lavis.datasets.builders.cloud_text_pair_builder import CloudCaptionBuilder
+
 from lavis.common.registry import registry
 
 __all__ = [

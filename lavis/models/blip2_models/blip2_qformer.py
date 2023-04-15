@@ -92,6 +92,7 @@ class Blip2Qformer(Blip2Base):
         text = samples["text_input"]
 
         image_embeds = self.ln_vision(self.visual_encoder(image))
+        cloud_emdeds = self.ln_cloud(self.cloud_encoder(cloud))
         image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(
             image.device
         )
