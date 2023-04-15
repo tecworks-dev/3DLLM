@@ -61,6 +61,10 @@ class Blip2Base(BaseModel):
         return Qformer, query_tokens
 
     @classmethod
+    def init_cloud_encoder(cls) :
+        cloud_encoder = PointTransformerEncoder(pretrain)
+
+    @classmethod
     def init_vision_encoder(
         cls, model_name, img_size, drop_path_rate, use_grad_checkpoint, precision
     ):

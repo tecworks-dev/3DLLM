@@ -1,0 +1,7 @@
+datasets:
+  3d_caption:
+    data_type: "pointcloud"
+    build_info:
+      annotations:
+        train:
+        

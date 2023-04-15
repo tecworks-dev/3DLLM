@@ -21,6 +21,11 @@ from lavis.processors.gpt_processors import (
     GPTVideoFeatureProcessor,
     GPTDialogueProcessor,
 )
+from lavis.processors.cloud_processors import (
+    CloudTrainProcessor,
+    ChineseCaptionProcessor,
+)
+
 from lavis.processors.clip_processors import ClipImageTrainProcessor
 
 from lavis.common.registry import registry
@@ -39,6 +44,9 @@ __all__ = [
     # GPT
     "GPTVideoFeatureProcessor",
     "GPTDialogueProcessor",
+    # 3D cloud 
+    "CloudTrainProcessor",
+    "ChineseCaptionProcessor",
 ]
 
 
