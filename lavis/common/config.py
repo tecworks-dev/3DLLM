@@ -37,7 +37,7 @@ class Config:
 
         # Override the default configuration with user options.
         self.config = OmegaConf.merge(
-            runner_config, model_config, dataset_config, user_config
+            OmegaConf.create(runner_config), model_config, dataset_config, user_config
         )
 
     def _validate_runner_config(self, runner_config):
@@ -75,7 +75,7 @@ class Config:
         model_config = OmegaConf.merge(
             model_config,
             OmegaConf.load(model_config_path),
-            {"model": config["model"]},
+            OmegaConf.create({"model": config["model"]}),
         )
 
         return model_config
@@ -106,7 +106,7 @@ class Config:
             dataset_config = OmegaConf.merge(
                 dataset_config,
                 OmegaConf.load(dataset_config_path),
-                {"datasets": {dataset_name: config["datasets"][dataset_name]}},
+                OmegaConf.create({"datasets": {dataset_name: config["datasets"][dataset_name]}}),
             )
 
         return dataset_config
