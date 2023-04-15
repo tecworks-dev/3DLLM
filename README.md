@@ -23,12 +23,37 @@
 <a href="https://github.com/salesforce/LAVIS/tree/main/examples">Jupyter Notebook Examples</a>,
 <a href="https://blog.salesforceairesearch.com/lavis-language-vision-library/">Blog</a>
 </div>
+# 数据集路径和账号
 
-# LAVIS - A Library for Language-Vision Intelligence
+## 山东服务器
+
+**IP：172.16.1.131 端口号22**
+
+==Point Transformer和Q Former环境== tdt(环境名称pointcept)、 rmq(环境名称pointformer)
+
+==数据集==  /data3/rmq/points_text_datasets (有S3DIS、ScanNet)
+
+==代码==  /home/rmq/PointTextCombine
+
+## 自动化所集群（好像不能debug）
+
+**IP：172.18.36.75 端口号22**
+
+两个账号 mengqi_rong8 （密码123456） / tang_xc_11（密码1111）
+
+配置环境时需要在admin下面，即运行salloc.sh之前。**运行程序前许先执行sh salloc.sh 然后执行ssh gpu8**
+
+salloc.sh 里的内容salloc -N 1 --cpus-per-task=1 --gres=gpu:8 -p td_ssh --nodelist gpu8
+
+**数据**存放在/public/public_data/3DLLM
+
+:point_down:Bl
+
+## LAVIS - A Library for Language-Vision Intelligence
 
 ## What's New: 🎉 
   * [Model Release] Jan 2023, released implementation of **BLIP-2** <br>
-  [Paper](https://arxiv.org/abs/2301.12597), [Project Page](https://github.com/salesforce/LAVIS/tree/main/projects/blip2), [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/salesforce/LAVIS/blob/main/examples/blip2_instructed_generation.ipynb)
+    [Paper](https://arxiv.org/abs/2301.12597), [Project Page](https://github.com/salesforce/LAVIS/tree/main/projects/blip2), [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/salesforce/LAVIS/blob/main/examples/blip2_instructed_generation.ipynb)
   > A generic and efficient pre-training strategy that easily harvests development of pretrained vision models and large language models (LLMs) for vision-language pretraining. BLIP-2 beats Flamingo on zero-shot VQAv2 (**65.0** vs **56.3**), establishing new state-of-the-art on zero-shot captioning (on NoCaps **121.6** CIDEr score vs previous best **113.2**). In addition, equipped with powerful LLMs (e.g. OPT, FlanT5), BLIP-2 also unlocks the new **zero-shot instructed vision-to-language generation** capabilities for various interesting applications!
   * Jan 2023, LAVIS is now available on [PyPI](https://pypi.org/project/salesforce-lavis/) for installation!
   * [Model Release] Dec 2022, released implementation of **Img2LLM-VQA** (**CVPR 2023**, _"From Images to Textual Prompts: Zero-shot VQA with Frozen Large Language Models"_, by Jiaxian Guo et al) <br>
@@ -37,7 +62,7 @@
   * [Model Release] Oct 2022, released implementation of **PNP-VQA** (**EMNLP Findings 2022**, _"Plug-and-Play VQA: Zero-shot VQA by Conjoining Large Pretrained Models with Zero Training"_, by Anthony T.M.H. et al), <br> 
   [Paper](https://arxiv.org/abs/2210.08773), [Project Page](https://github.com/salesforce/LAVIS/tree/main/projects/pnp-vqa), [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/salesforce/LAVIS/blob/main/projects/pnp-vqa/pnp_vqa.ipynb))
   >  A modular zero-shot VQA framework that requires no PLMs training, achieving SoTA zero-shot VQA performance. 
-    
+
 ## Table of Contents
 - [LAVIS - A Library for Language-Vision Intelligence](#lavis---a-library-for-language-vision-intelligence)
   - [What's New: 🎉](#whats-new-)
@@ -117,7 +142,7 @@ conda activate lavis
 ```bash
 pip install salesforce-lavis
 ```
-    
+
 3. Or, for development, you may build from source
 
 ```bash
