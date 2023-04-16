@@ -39,7 +39,7 @@ run:
   weight_decay: 0.05
   max_epoch: 10
   batch_size_train: 2       # 原本为100
-  batch_size_eval: 1        # 原本为64
+  batch_size_eval: 2        # 原本为64
   num_workers: 4
   warmup_steps: 5000
 
