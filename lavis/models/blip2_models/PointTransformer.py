@@ -552,7 +552,8 @@ class PointTransformerV2(nn.Module):
                 else:
                     #若不够self.num_features个维度，则在填充了原来的数据的情况下，再随机采点
                     expand_dim = self.num_features - featurelength
-                    random_sample = random.sample(range(featurelength), expand_dim)
+                    # random_sample = random.sample(range(featurelength), expand_dim)
+                    random_sample = torch.randint(featurelength, (expand_dim,))
                     #将已有的特征点和随机采样的特征点拼接在一起
                     feat_list.append(torch.cat((feat[:offset[i],:],feat[random_sample, :]), dim=0))
             else:
@@ -564,8 +565,9 @@ class PointTransformerV2(nn.Module):
                     #feat_list.append(feat[offset[i - 1]:offset[i], :])
                 else:
                     expand_dim = self.num_features - featurelength
-                    random_sample = random.sample(range(featurelength), expand_dim)
-                    random_sample = torch.tensor(random_sample)
+                    # random_sample = random.sample(range(featurelength), expand_dim)
+                    random_sample = torch.randint(featurelength, (expand_dim,))
+                    # random_sample = torch.tensor(random_sample)
                     feat_list.append(torch.cat((feat[offset[i - 1]:offset[i],:],feat[random_sample + offset[i - 1].item(), :]), dim=0))
         
         #以现在的网络，最后的Encoder输出是N*C的特征，N是点云的数量，C是特征的维度

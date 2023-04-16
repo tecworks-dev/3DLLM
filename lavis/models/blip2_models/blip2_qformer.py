@@ -69,9 +69,9 @@ class Blip2Qformer(Blip2Base):
             logging.info("freeze point cloud encoder")
 
         
-
+        # TODO : 不要固定为384 需要根据point cloud encoder的输出来确定
         self.Qformer, self.query_tokens = self.init_Qformer(
-            num_query_token, self.cloud_encoder.num_features, cross_attention_freq, qformer_encoder_layer
+            num_query_token, 384, cross_attention_freq, qformer_encoder_layer
         )
         self.Qformer.resize_token_embeddings(len(self.tokenizer))
         state_dict = self.Qformer.state_dict()
@@ -155,7 +155,8 @@ class Blip2Qformer(Blip2Base):
         sim_t2i = sim_t2i / self.temp  # [batch_size, batch_size*num_gpu]
 
         rank = dist.get_rank()
-        bs = image.size(0)
+        # bs = image.size(0)
+        bs = image_embeds.size(0)
         targets = torch.linspace(rank * bs, rank * bs + bs - 1, bs, dtype=int).to(
             device
         )

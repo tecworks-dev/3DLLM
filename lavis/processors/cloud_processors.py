@@ -450,7 +450,7 @@ class CloudTrainProcessor(BaseProcessor):
         # pcd_dict = SphereCrop(point_max=100000, mode='random')(pcd_dict)
 
         # 随机下采样是我自己实现的，而对于其他的数据变换方式是原来的PointTransformer2的代码
-        pcd_dict = RandomSample(max_num=65536)(pcd_dict)
+        pcd_dict = RandomSample(max_num=80000)(pcd_dict)
         pcd_dict = CenterShift(apply_z=False)(pcd_dict)
         pcd_dict = NormalizeColor()(pcd_dict)
         pcd_dict = ToTensor()(pcd_dict)
@@ -488,8 +488,9 @@ class CloudTestProcessor(BaseProcessor):
         # 接下来是对点云进行数据增强
         pcd_dict = CenterShift(apply_z=True)(pcd_dict)
         pcd_dict = Copy(keys_dict={"coord": "origin_coord", "label": "origin_label"})(pcd_dict)
-        pcd_dict = Voxelize(voxel_size=0.04, hash_type='fnv', mode='train',
-                    keys=("coord", "color", "label"), return_discrete_coord=True)(pcd_dict)
+        # pcd_dict = Voxelize(voxel_size=0.04, hash_type='fnv', mode='train',
+        #             keys=("coord", "color", "label"), return_discrete_coord=True)(pcd_dict)
+        pcd_dict = RandomSample(max_num=80000)(pcd_dict)
         pcd_dict = CenterShift(apply_z=False)(pcd_dict)
         pcd_dict = NormalizeColor()(pcd_dict)
         pcd_dict = ToTensor()(pcd_dict)
