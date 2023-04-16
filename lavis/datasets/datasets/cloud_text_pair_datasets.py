@@ -9,45 +9,61 @@ import torch
 
 from lavis.datasets.datasets.base_dataset import BaseDataset
 from PIL import Image
+from typing import List, Tuple
+import json
 
-def cloud_processor(cloud:torch.Tensor) -> torch.Tensor:
-    '''
-    对输入的点云进行处理, 可以是降采样, 数据增强等等
-    Args:
-        cloud: (N, 3) tensor
-    Returns:
-        cloud: (N, 3) tensor
-    '''
-
-
+def load_point_cloud(path:str) -> torch.Tensor:
+    """
+    从文件中读取点云
+    path: 点云路径,绝对路径
+    return: 点云, shape: (N, 3)
+    """
+    cloud = torch.zeros((2048, 3))
     return cloud
 
-def text_processor(text:str, max_length:int=-1) -> str:
-    '''
-    对输入的文本进行处理, 主要是去除空格, 换行符等等
-    max_length: 最大长度, 超过的部分截断, -1表示无限制 
-    '''
+def load_pairs(path:str) -> List[Tuple[str, str]]:
+    """
+    从文件中读取点云和对应的caption
+    path: 文件路径, 绝对路径
+    return: List[List[str, str]], 每个元素是一个List, 第一个元素是点云路径, 第二个元素是对应的caption
+    """
+    init_pairs = json.load(open(path, "r"))
+    pairs = []          # 含有N个元素, 每个元素是 [cloud_path, caption]
+    for cloud_path in init_pairs.keys():
+        for caption in init_pairs[cloud_path]:
+            pairs.append([cloud_path, caption])
+    return pairs
 
-    return text
-
-class CloudTextPairDataset():
-    def __init__(self, vis_processor, text_processor, text_prompt:str=""):
+# 虽然这里继承了 BaseDataset, 但这个类覆写了__getitem__和__len__方法, 这里继承的主要目的是之后dataloader建立的时候不报错
+# 由于时间关系, 我没有看dataloader是怎么建立的, 所以就直接继承了BaseDataset
+class CloudTextPairDataset(BaseDataset):
+    def __init__(self, vis_processor, text_processor, text_prompt:str="", path:str=""):
+        """
+        点云和对应的caption的数据集, 里面存储了点云和对应的caption, 如果点云对应于N个caption, 那么就会有N个元素具有相同的点云不同的caption
+        vis_processor: 对点云进行处理的函数, 叫做 vis_processor 只是为了和原本的代码保持一致
+        text_processor: 对caption进行处理的函数
+        text_prompt: caption的前缀, 最终的caption是 text_prompt + caption
+        path: 存储点云和对应的caption的文件的路径, 绝对路径
+        """
+        super().__init__()
         self.text_prompt = text_prompt
         self.vis_processor = vis_processor  # 其实是对点云进行处理, 只是名字叫做 vis_processor
         self.text_processor = text_processor
+        # self.cloud_text_pairs = load_pairs(path)
+        self.cloud_text_pairs = [["test.pcd", "frist test caption"],["test2.pcd", "second test caption"]]
         
         
 
     def __getitem__(self, index):
 
-        # TODO this assumes image input, not general enough
-        ann = self.annotation[index]
+        pair = self.cloud_text_pairs[index]
+        cloud = load_point_cloud(pair[0])
+        caption = pair[1]
 
-        image_path = os.path.join(self.vis_root, ann["image"])
-        image = Image.open(image_path).convert("RGB")
+        cloud = self.vis_processor(cloud)
+        caption = self.text_processor(caption)
 
-        image = self.vis_processor(image)
-        caption = self.text_processor(ann["caption"])
+        image = torch.ones((3, 224, 224))
 
         return {"image": image, "text_input": caption}
 
@@ -61,3 +77,6 @@ class CloudTextPairDataset():
                 "image": sample["image"],
             }
         )
+    
+    def __len__(self):
+        return len(self.cloud_text_pairs)

@@ -44,8 +44,8 @@ class CloudTrainProcessor(BaseProcessor):
         self.max_size = max_size
 
     # TODO 对点云进行裁剪, 降采样, 数据增强等等
-    def __call__(self, item):
-        return item 
+    def __call__(self, point_cloud):
+        return point_cloud 
     
     @classmethod
     def from_config(cls, cfg=None):
@@ -55,3 +55,4 @@ class CloudTrainProcessor(BaseProcessor):
         max_size = cfg.get("max_size", 2048)
 
         return cls(max_size=max_size)
+    
