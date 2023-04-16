@@ -23,5 +23,5 @@ model:
   qformer_encoder_layer: 12
 
   # Llama
-  llama_model: "llama_chinese"
-  pretrained_llama_path: ""
+  llama_model: "llama_chinese"        # 名字, 目前没有作用
+  pretrained_llama_path: "/home/tdt/Llama/"           # 预训练的llama模型的保存路径, 注意是一个文件夹, 绝对路径

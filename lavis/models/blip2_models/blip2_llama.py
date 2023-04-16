@@ -22,17 +22,9 @@ from transformers import LlamaConfig, LlamaModel, LlamaForCausalLM
 
 
 @registry.register_model("blip2_llama")
-class Blip2OPT(Blip2Base):
+class Blip2Llama(Blip2Base):
     """
-    BLIP2 OPT model.
-    Supported model types:
-        - pretrained_opt2.7b: pretrained model with OPT2.7b
-        - pretrained_opt6.7b: pretrained model with OPT6.7b
-        - caption_coco_opt2.7b: fintuned image captioning model with OPT2.7b
-        - caption_coco_opt6.7b: fintuned image captioning model with OPT6.7b
-    Usage:
-        >>> from lavis.models import load_model
-        >>> model = load_model("blip2_opt", "caption_coco_opt2.7b")
+    BLIP2 Llama model.
     """
 
     PRETRAINED_MODEL_CONFIG_DICT = {
@@ -261,7 +253,6 @@ class Blip2OPT(Blip2Base):
         vit_model = cfg.get("vit_model", "eva_clip_g")
         img_size = cfg.get("image_size")
         num_query_token = cfg.get("num_query_token")
-        opt_model = cfg.get("opt_model")
 
         drop_path_rate = cfg.get("drop_path_rate", 0)
         use_grad_checkpoint = cfg.get("use_grad_checkpoint", False)
@@ -271,6 +262,9 @@ class Blip2OPT(Blip2Base):
         prompt = cfg.get("prompt", "")
         max_txt_len = cfg.get("max_txt_len", 32)
 
+        pritrained_llama_model_path = cfg.get("pretrained_llama_path", "")
+        qformer_encoder_layer = cfg.get("qformer_encoder_layer", 12)
+
         model = cls(
             vit_model=vit_model,
             img_size=img_size,
@@ -279,9 +273,10 @@ class Blip2OPT(Blip2Base):
             vit_precision=vit_precision,
             freeze_vit=freeze_vit,
             num_query_token=num_query_token,
-            opt_model=opt_model,
+            llama_model_path=pritrained_llama_model_path,
             prompt=prompt,
             max_txt_len=max_txt_len,
+            qformer_encoder_layer=qformer_encoder_layer,
         )
         model.load_checkpoint_from_config(cfg)
 
