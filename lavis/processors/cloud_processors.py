@@ -56,3 +56,23 @@ class CloudTrainProcessor(BaseProcessor):
 
         return cls(max_size=max_size)
     
+
+@registry.register_processor("cloud_test")
+class CloudTestProcessor(BaseProcessor):
+    def __init__(self, max_size:int):
+        super().__init__()
+        self.max_size = max_size
+
+    # TODO 对点云进行裁剪, 降采样等等
+    def __call__(self, point_cloud):
+        return point_cloud 
+    
+    @classmethod
+    def from_config(cls, cfg=None):
+        if cfg is None:
+            cfg = OmegaConf.create()
+
+        max_size = cfg.get("max_size", 2048)
+
+        return cls(max_size=max_size)
+    
