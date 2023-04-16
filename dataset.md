@@ -31,9 +31,7 @@ There are 10 rooms, incluing 1 living room, 1 kitchen, 3 bedrooms, 2 bathrooms, 
 
 3.在S3dis数据集添加房间类型描述：
 
-
 A room with a table, chairs, and a clock on the wall. a room filled with desks and chairs with books on them. a classroom with a desk with a computer and chairs. a row of chairs sitting in front of a window. a white wall with a picture of a man on it. **this is a conferenceRoom**.
-
 
 4.完成英文数据集至中文数据集的翻译
 
