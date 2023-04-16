@@ -27,9 +27,9 @@ text:
 
 ## struture3d
 
-point cloud:
+point cloud:`/public/public_data/3DLLM/str3d_pc/pc/` including train/test/val
 
-text:
+text: `/public/public_data/3DLLM/str3d_text/` including train/test/val
 
 ## 已完成
 
@@ -56,4 +56,6 @@ scannet:
 
 "scene0000_00": "照片显示，一只猫躺在房间的床上，一辆自行车停在门前，一个吉他盒放在地毯旁边的地板上。其他图片显示厨房有一个水槽，浴室有两个水槽和一把椅子，客厅有一张沙发和一台电视，卧室有一张床和一张桌子。"
 
+str3d:
+"  "/data3/rmq/scene_00003.ply": "有7个房间，包括1间客厅，1间厨房，2间卧室，1间浴室，1个阳台，1个书房，有7个门，有5个窗户，浴室和客厅有门连通。书房和客厅有门连通。阳台和客厅有门连通。客厅和厨房有门连通。卧室和客厅都有门连通。客厅和卧室都有连接。客厅向外连接。厨房有1个窗户，卧室有2个窗户。"
 ## 未完成
