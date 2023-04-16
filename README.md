@@ -52,6 +52,13 @@ port:22
 
 #### 数据存储
 
-```txt
-/public/public_data/3DLLM
-```
+[dataset.md](https://github.com/rongmq8802/3DLLM/blob/main/dataset.md)
+
+#### 项目修改
+
+[codechange.md](https://github.com/rongmq8802/3DLLM/blob/main/CodeChange.md)
+
+
+#### 代码流程
+
+[代码流程.md](https://github.com/rongmq8802/3DLLM/blob/main/%E4%BB%A3%E7%A0%81%E6%B5%81%E7%A8%8B.md)
