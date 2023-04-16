@@ -29,9 +29,12 @@ def load_pairs(path:str) -> List[Tuple[str, str]]:
     """
     init_pairs = json.load(open(path, "r"))
     pairs = []          # 含有N个元素, 每个元素是 [cloud_path, caption]
+    data_root = '/data3/rmq/points_text_datasets/S3DIS/s3dis_processed/'     #data root of the dataset
+    data_type = '.pth'                                                       #data type, which can be pth/ply or others
+    # the absolute path can be expresses as: data_root + str(cloud_path) + data_type
     for cloud_path in init_pairs.keys():
         for caption in init_pairs[cloud_path]:
-            pairs.append([cloud_path, caption])
+            pairs.append([data_root + cloud_path + data_type, caption])
     return pairs
 
 # 虽然这里继承了 BaseDataset, 但这个类覆写了__getitem__和__len__方法, 这里继承的主要目的是之后dataloader建立的时候不报错
