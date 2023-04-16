@@ -44,13 +44,14 @@ class Blip2Base(BaseModel):
             return contextlib.nullcontext()
 
     @classmethod
-    def init_Qformer(cls, num_query_token, vision_width, cross_attention_freq=2):
+    def init_Qformer(cls, num_query_token, vision_width, cross_attention_freq=2, encoder_layer=12):
         encoder_config = BertConfig.from_pretrained("bert-base-uncased")
         encoder_config.encoder_width = vision_width
         # insert cross-attention layer every other block
         encoder_config.add_cross_attention = True
         encoder_config.cross_attention_freq = cross_attention_freq
         encoder_config.query_length = num_query_token
+        encoder_config.num_hidden_layers = encoder_layer
         Qformer = BertLMHeadModel.from_pretrained(
             "bert-base-uncased", config=encoder_config
         )
@@ -61,8 +62,13 @@ class Blip2Base(BaseModel):
         return Qformer, query_tokens
 
     @classmethod
-    def init_cloud_encoder(cls) :
-        cloud_encoder = PointTransformerEncoder(pretrain)
+    def init_cloud_encoder(cls, model_name, max_cloud_size, drop_path_rate, use_grad_checkpoint) :
+        if (model_name == "point_transformer"):
+            cloud_encoder = PointTransformerEncoder(pretrain)
+        else:
+            raise KeyError("cloud encoder must be point_transformer")
+        ln_cloud = LayerNorm(cloud_encoder.num_features)
+        return cloud_encoder, ln_cloud
 
     @classmethod
     def init_vision_encoder(
