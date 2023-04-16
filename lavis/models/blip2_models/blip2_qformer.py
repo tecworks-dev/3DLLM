@@ -42,12 +42,8 @@ class Blip2Qformer(Blip2Base):
 
     def __init__(
         self,
-        vit_model="eva_clip_g",         # deprecated sooner
-        img_size=224,                   # deprecated sooner
         drop_path_rate=0,
         use_grad_checkpoint=False,
-        vit_precision="fp16",           # deprecated sooner
-        freeze_vit=True,                # deprecated sooner
         point_cloud_encoder_model = None,
         freeze_point_cloud_encoder = True,
         max_cloud_size = 10000,
@@ -56,34 +52,26 @@ class Blip2Qformer(Blip2Base):
         embed_dim=256,
         max_txt_len=32,
         qformer_encoder_layer=12,
+        point_cloud_encoder_pretrain_model_path = None,
     ):
         super().__init__()
 
         self.tokenizer = self.init_tokenizer()
 
-        self.visual_encoder, self.ln_vision = self.init_vision_encoder(
-            vit_model, img_size, drop_path_rate, use_grad_checkpoint, vit_precision
+        self.cloud_encoder, self.ln_cloud = self.init_cloud_encoder(
+            point_cloud_encoder_model, max_cloud_size, drop_path_rate, use_grad_checkpoint, point_cloud_encoder_pretrain_model_path
         )
-        if(point_cloud_encoder_model is not None):
-            self.cloud_encoder, self.ln_cloud = self.init_cloud_encoder(
-                point_cloud_encoder_model, max_cloud_size, drop_path_rate, use_grad_checkpoint
-            )
-            if freeze_point_cloud_encoder:
-                for name, param in self.cloud_encoder.named_parameters():
-                    param.requires_grad = False
-                self.cloud_encoder = self.cloud_encoder.eval()
-                self.cloud_encoder.train = disabled_train
-                logging.info("freeze point cloud encoder")
-
-        if freeze_vit:
-            for name, param in self.visual_encoder.named_parameters():
+        if freeze_point_cloud_encoder:
+            for name, param in self.cloud_encoder.named_parameters():
                 param.requires_grad = False
-            self.visual_encoder = self.visual_encoder.eval()
-            self.visual_encoder.train = disabled_train
-            logging.info("freeze vision encoder")
+            self.cloud_encoder = self.cloud_encoder.eval()
+            self.cloud_encoder.train = disabled_train
+            logging.info("freeze point cloud encoder")
+
+        
 
         self.Qformer, self.query_tokens = self.init_Qformer(
-            num_query_token, self.visual_encoder.num_features, cross_attention_freq, qformer_encoder_layer
+            num_query_token, self.cloud_encoder.num_features, cross_attention_freq, qformer_encoder_layer
         )
         self.Qformer.resize_token_embeddings(len(self.tokenizer))
         state_dict = self.Qformer.state_dict()
@@ -101,11 +89,12 @@ class Blip2Qformer(Blip2Base):
 
         self.max_txt_len = max_txt_len
 
+   
     def forward(self, samples):
-        image = samples["image"]
+        image = samples["cloud"]
         text = samples["text_input"]
 
-        image_embeds = self.ln_vision(self.visual_encoder(image))   # [B, N, C]
+        image_embeds = self.ln_cloud(self.cloud_encoder(image))   # [B, N, C]
         # cloud_emdeds = self.ln_cloud(self.cloud_encoder(cloud))
         image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(     # [B, N]
             image.device
@@ -509,20 +498,23 @@ class Blip2Qformer(Blip2Base):
 
         max_txt_len = cfg.get("max_txt_len", 32)
         qformer_encoder_layer = cfg.get("qformer_encoder_layer", 12)
+        point_cloud_encoder_model = cfg.get("point_cloud_encoder_model", "point_transformer")
+        point_cloud_encoder_pretrain_model_path = cfg.get("point_cloud_encoder_model_path", None)
 
+        # 这里就同时初始化了 Q-former 和 point cloud encoder
         model = cls(
-            vit_model=vit_model,
-            img_size=img_size,
+            point_cloud_encoder_model = point_cloud_encoder_model,
             drop_path_rate=drop_path_rate,
             use_grad_checkpoint=use_grad_checkpoint,
-            vit_precision=vit_precision,
-            freeze_vit=freeze_vit,
             num_query_token=num_query_token,
             cross_attention_freq=cross_attention_freq,
             max_txt_len=max_txt_len,
             qformer_encoder_layer=qformer_encoder_layer,
+            point_cloud_encoder_pretrain_model_path = point_cloud_encoder_pretrain_model_path,
         )
-        model.load_checkpoint_from_config(cfg)
+
+        if cfg.get("load_finetuned", False) or cfg.get("load_pretrained", False):
+            model.load_checkpoint_from_config(cfg)
 
         return model
 

@@ -442,12 +442,14 @@ class PointTransformerV2(nn.Module):
                  enable_checkpoint=False,
                  unpool_backend="map",
                  num_features=512,
+                 checkpoint_path=None,
                  ):
         super(PointTransformerV2, self).__init__()
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.num_stages = len(enc_depths)
         self.num_features = num_features
+        self.checkpoint_path = checkpoint_path
         assert self.num_stages == len(dec_depths)
         assert self.num_stages == len(enc_channels)
         assert self.num_stages == len(dec_channels)
@@ -513,6 +515,9 @@ class PointTransformerV2(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(dec_channels[0], num_classes)
         ) if num_classes > 0 else nn.Identity()
+        
+        if self.checkpoint_path is not None:
+            self.load_pretrained_model()
 
     def forward(self, data_dict):
         coord = data_dict["coord"]
@@ -565,3 +570,12 @@ class PointTransformerV2(nn.Module):
                     feat_list.append(torch.cat((feat[offset[i - 1]:offset[i],:],feat[random_sample + offset[i - 1].item(), :]), dim=0))
         
         return feat_list
+
+
+    def load_pretrained_model(self):
+        pretrained_dict = torch.load(self.checkpoint_path, map_location="cpu")
+        model_dict = self.state_dict()
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        model_dict.update(pretrained_dict)
+        self.load_state_dict(model_dict)
+        print("Load pretrained model from {}".format(self.checkpoint_path)) 

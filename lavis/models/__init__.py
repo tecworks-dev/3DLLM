@@ -75,7 +75,7 @@ __all__ = [
     "Blip2ITM",
     "Blip2OPT",
     "Blip2T5",
-    "Blip2Llama"
+    "Blip2Llama",
     "PNPVQA",
     "Img2PromptVQA",
     "PNPUnifiedQAv2FiD",
