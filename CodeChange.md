@@ -18,3 +18,21 @@ dataset = builder.build_datasets()
 建立一个假数据测试
 2. Point Transformer 构建 
 3. llama 模型
+
+
+
+
+
+
+
+
+
+RongMengqi 修改
+1. 上传了PointTransformer网络，并打开了一个接口，可以控制输出的特征点的数目
+2. 完成了load_pairs函数（从文件中读取点云模型的路径和对应的文本描述）cloud_text_pair_datasets.py
+3. 完成了对点云的预处理代码撰写 主要是cloud_processors.py
+
+
+
+TODO:
+1. models/libs/pointops下面的setup可能需要重新安装
