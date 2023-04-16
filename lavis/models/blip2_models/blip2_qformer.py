@@ -91,14 +91,14 @@ class Blip2Qformer(Blip2Base):
 
    
     def forward(self, samples):
+        
         image = samples["cloud"]
         text = samples["text_input"]
+        device = image["coord"].device
 
         image_embeds = self.ln_cloud(self.cloud_encoder(image))   # [B, N, C]
         # cloud_emdeds = self.ln_cloud(self.cloud_encoder(cloud))
-        image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(     # [B, N]
-            image.device
-        )
+        image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(device)  # [B, N]
 
         query_tokens = self.query_tokens.expand(image_embeds.shape[0], -1, -1)      # [32, 768] -> [B, 32, 768]
 
@@ -120,7 +120,7 @@ class Blip2Qformer(Blip2Base):
             truncation=True,
             max_length=self.max_txt_len,
             return_tensors="pt",
-        ).to(image.device)
+        ).to(device)
         text_output = self.Qformer.bert(
             text_tokens.input_ids,
             attention_mask=text_tokens.attention_mask,
@@ -157,7 +157,7 @@ class Blip2Qformer(Blip2Base):
         rank = dist.get_rank()
         bs = image.size(0)
         targets = torch.linspace(rank * bs, rank * bs + bs - 1, bs, dtype=int).to(
-            image.device
+            device
         )
 
         loss_itc = (
@@ -203,7 +203,7 @@ class Blip2Qformer(Blip2Base):
 
         query_tokens_itm = self.query_tokens.expand(text_ids_all.shape[0], -1, -1)
         query_atts_itm = torch.ones(query_tokens_itm.size()[:-1], dtype=torch.long).to(
-            image.device
+            device
         )
         attention_mask_all = torch.cat([query_atts_itm, text_atts_all], dim=1)
 
@@ -211,7 +211,7 @@ class Blip2Qformer(Blip2Base):
             [image_embeds, image_embeds_neg, image_embeds], dim=0
         )  # pos, neg, pos
         image_atts_all = torch.ones(image_embeds_all.size()[:-1], dtype=torch.long).to(
-            image.device
+            device
         )
 
         output_itm = self.Qformer.bert(
@@ -230,7 +230,7 @@ class Blip2Qformer(Blip2Base):
         itm_labels = torch.cat(
             [torch.ones(bs, dtype=torch.long), torch.zeros(2 * bs, dtype=torch.long)],
             dim=0,
-        ).to(image.device)
+        ).to(device)
         loss_itm = F.cross_entropy(logits, itm_labels)
 
         ##================= Image Captioning ========================##
@@ -241,7 +241,7 @@ class Blip2Qformer(Blip2Base):
         )
 
         query_atts = torch.ones(query_tokens.size()[:-1], dtype=torch.long).to(
-            image.device
+            device
         )
         attention_mask = torch.cat([query_atts, text_tokens.attention_mask], dim=1)
         lm_output = self.Qformer(
@@ -486,26 +486,24 @@ class Blip2Qformer(Blip2Base):
 
     @classmethod
     def from_config(cls, cfg):
-        vit_model = cfg.get("vit_model", "eva_clip_g")
-        img_size = cfg.get("image_size")
         num_query_token = cfg.get("num_query_token")
         cross_attention_freq = cfg.get("cross_attention_freq", 2)
 
         drop_path_rate = cfg.get("drop_path_rate", 0)
         use_grad_checkpoint = cfg.get("use_grad_checkpoint", False)
-        vit_precision = cfg.get("vit_precision", "fp16")
-        freeze_vit = cfg.get("freeze_vit", True)
 
         max_txt_len = cfg.get("max_txt_len", 32)
         qformer_encoder_layer = cfg.get("qformer_encoder_layer", 12)
         point_cloud_encoder_model = cfg.get("point_cloud_encoder_model", "point_transformer")
         point_cloud_encoder_pretrain_model_path = cfg.get("point_cloud_encoder_model_path", None)
+        freeze_point_cloud_encoder = cfg.get("freeze_cloud_encoder", True)
 
         # 这里就同时初始化了 Q-former 和 point cloud encoder
         model = cls(
-            point_cloud_encoder_model = point_cloud_encoder_model,
             drop_path_rate=drop_path_rate,
             use_grad_checkpoint=use_grad_checkpoint,
+            point_cloud_encoder_model = point_cloud_encoder_model,
+            freeze_point_cloud_encoder = freeze_point_cloud_encoder,
             num_query_token=num_query_token,
             cross_attention_freq=cross_attention_freq,
             max_txt_len=max_txt_len,

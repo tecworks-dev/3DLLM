@@ -33,12 +33,8 @@ class Blip2Llama(Blip2Base):
 
     def __init__(
         self,
-        vit_model="eva_clip_g",         # deprecated sooner
-        img_size=224,                   # deprecated sooner
         drop_path_rate=0,
         use_grad_checkpoint=False,
-        vit_precision="fp16",           # deprecated sooner
-        freeze_vit=True,                # deprecated sooner
         point_cloud_encoder_model = None,
         freeze_point_cloud_encoder = True,
         max_cloud_size = 10000,
@@ -47,34 +43,26 @@ class Blip2Llama(Blip2Base):
         prompt="",
         max_txt_len=32,
         qformer_encoder_layer=12,
+        point_cloud_encoder_pretrain_model_path = None,
     ):
         super().__init__()
 
         self.tokenizer = self.init_tokenizer()
 
-        if(point_cloud_encoder_model is not None):
-            self.cloud_encoder, self.ln_cloud = self.init_cloud_encoder(
-                point_cloud_encoder_model, max_cloud_size, drop_path_rate, use_grad_checkpoint
-            )
-            if freeze_point_cloud_encoder:
-                for name, param in self.cloud_encoder.named_parameters():
-                    param.requires_grad = False
-                self.cloud_encoder = self.cloud_encoder.eval()
-                self.cloud_encoder.train = disabled_train
-                logging.info("freeze point cloud encoder")
-
-        self.visual_encoder, self.ln_vision = self.init_vision_encoder(
-            vit_model, img_size, drop_path_rate, use_grad_checkpoint, vit_precision
+        
+        self.cloud_encoder, self.ln_cloud = self.init_cloud_encoder(
+            point_cloud_encoder_model, max_cloud_size, drop_path_rate, use_grad_checkpoint, point_cloud_encoder_pretrain_model_path
         )
-        if freeze_vit:
-            for name, param in self.visual_encoder.named_parameters():
+        if freeze_point_cloud_encoder:
+            for name, param in self.cloud_encoder.named_parameters():
                 param.requires_grad = False
-            self.visual_encoder = self.visual_encoder.eval()
-            self.visual_encoder.train = disabled_train
-            logging.info("freeze vision encoder")
+            self.cloud_encoder = self.cloud_encoder.eval()
+            self.cloud_encoder.train = disabled_train
+            logging.info("freeze point cloud encoder")
+
 
         self.Qformer, self.query_tokens = self.init_Qformer(
-            num_query_token, self.visual_encoder.num_features, encoder_layer=qformer_encoder_layer
+            num_query_token, self.cloud_encoder.num_features, encoder_layer=qformer_encoder_layer
         )
         self.Qformer.cls = None
         self.Qformer.bert.embeddings.word_embeddings = None
@@ -102,9 +90,10 @@ class Blip2Llama(Blip2Base):
         self.prompt_length = prompt_tokens.attention_mask.sum(1)
 
     def forward(self, samples):
-        image = samples["image"]
+        image = samples["cloud"]
         with self.maybe_autocast():
-            image_embeds = self.ln_vision(self.visual_encoder(image))
+            image_embeds = self.ln_cloud(self.cloud_encoder(image))
+            # image_embeds = self.ln_vision(self.visual_encoder(image))
         image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(
             image.device
         )
@@ -143,12 +132,12 @@ class Blip2Llama(Blip2Base):
         )
         targets = torch.cat([empty_targets, targets], dim=1)
 
-        inputs_embeds = self.opt_model.model.decoder.embed_tokens(llama_tokens.input_ids)
+        inputs_embeds = self.llama_model.model.decoder.embed_tokens(llama_tokens.input_ids)
         inputs_embeds = torch.cat([inputs_opt, inputs_embeds], dim=1)
         attention_mask = torch.cat([atts_opt, llama_tokens.attention_mask], dim=1)
 
         with self.maybe_autocast():
-            outputs = self.opt_model(
+            outputs = self.llama_model(
                 inputs_embeds=inputs_embeds,
                 attention_mask=attention_mask,
                 return_dict=True,
@@ -250,34 +239,34 @@ class Blip2Llama(Blip2Base):
 
     @classmethod
     def from_config(cls, cfg):
-        vit_model = cfg.get("vit_model", "eva_clip_g")
-        img_size = cfg.get("image_size")
         num_query_token = cfg.get("num_query_token")
 
         drop_path_rate = cfg.get("drop_path_rate", 0)
         use_grad_checkpoint = cfg.get("use_grad_checkpoint", False)
-        vit_precision = cfg.get("vit_precision", "fp16")
-        freeze_vit = cfg.get("freeze_vit", True)
 
         prompt = cfg.get("prompt", "")
         max_txt_len = cfg.get("max_txt_len", 32)
 
         pritrained_llama_model_path = cfg.get("pretrained_llama_path", "")
         qformer_encoder_layer = cfg.get("qformer_encoder_layer", 12)
+        point_cloud_encoder_model = cfg.get("point_cloud_encoder_model", "point_transformer")
+        point_cloud_encoder_pretrain_model_path = cfg.get("point_cloud_encoder_model_path", None)
+        freeze_point_cloud_encoder = cfg.get("freeze_cloud_encoder", True)
 
         model = cls(
-            vit_model=vit_model,
-            img_size=img_size,
+            point_cloud_encoder_model = point_cloud_encoder_model,
             drop_path_rate=drop_path_rate,
             use_grad_checkpoint=use_grad_checkpoint,
-            vit_precision=vit_precision,
-            freeze_vit=freeze_vit,
+            freeze_point_cloud_encoder = freeze_point_cloud_encoder,
             num_query_token=num_query_token,
             llama_model_path=pritrained_llama_model_path,
             prompt=prompt,
             max_txt_len=max_txt_len,
             qformer_encoder_layer=qformer_encoder_layer,
+            point_cloud_encoder_pretrain_model_path = point_cloud_encoder_pretrain_model_path,
         )
-        model.load_checkpoint_from_config(cfg)
+
+        if cfg.get("load_finetuned", False) or cfg.get("load_pretrained", False):
+            model.load_checkpoint_from_config(cfg)
 
         return model

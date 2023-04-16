@@ -1,9 +1,9 @@
 model:
   arch: llama_chinese
   load_finetuned: False
+  load_pretrained: False      # 目前为了调试设为了False 实际使用时要设为True 而且要为下面的 pretrained 参数赋值
   pretrained: ""
   finetuned: ""
-  
   
   # point transformer encoder
   cloud_max_size: 10000
@@ -11,12 +11,6 @@ model:
   use_grad_checkpoint: False
   freeze_cloud_encoder: True
 
-  # vit 未来要删去, 目前是为了兼容性
-  image_size: 224
-  vit_precision: "fp16"
-  freeze_vit: True
-  pretrained: "https://storage.googleapis.com/sfr-vision-language-research/LAVIS/models/BLIP2/blip2_pretrained.pth"
-  finetuned: ""
 
   # Q-Former
   num_query_token: 32
@@ -25,3 +19,4 @@ model:
   # Llama
   llama_model: "llama_chinese"        # 名字, 目前没有作用
   pretrained_llama_path: "/home/tdt/Llama/"           # 预训练的llama模型的保存路径, 注意是一个文件夹, 绝对路径
+  max_txt_length: 100

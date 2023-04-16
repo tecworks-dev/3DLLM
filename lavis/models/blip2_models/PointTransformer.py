@@ -1,13 +1,5 @@
-"""
-Point Transformer V2 Mode (recommend)
-
-Disable Grouped Linear
-
-Author: Xiaoyang Wu (xiaoyang.wu.cs@gmail.com)
-Please cite our work if the code is helpful to you.
-"""
-
 from copy import deepcopy
+import math
 import torch
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint
@@ -441,7 +433,7 @@ class PointTransformerV2(nn.Module):
                  drop_path_rate=0,
                  enable_checkpoint=False,
                  unpool_backend="map",
-                 num_features=512,
+                 num_features=256,
                  checkpoint_path=None,
                  ):
         super(PointTransformerV2, self).__init__()
@@ -515,11 +507,17 @@ class PointTransformerV2(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(dec_channels[0], num_classes)
         ) if num_classes > 0 else nn.Identity()
-        
+
         if self.checkpoint_path is not None:
             self.load_pretrained_model()
 
+
     def forward(self, data_dict):
+        # 按照默认的DataLoader读入数据，是存在batch这种信息的，而PointTransformer在读入时会把所有batch的信息拼在一起
+        # 所以在这里要做一个特别的处理，把batch的信息合并到一个torch.Tensor里面
+
+        data_dict = self.merge_batch(data_dict)
+
         coord = data_dict["coord"]
         feat = data_dict["feat"]
         offset = data_dict["offset"].int()
@@ -539,6 +537,7 @@ class PointTransformerV2(nn.Module):
         #     points = self.dec_stages[i](points, skip_points, cluster)
         coord, feat, offset = points
         # seg_logits = self.seg_head(feat)
+        # feat = points[1]
 
         # 按照offset的划分，将feat分成多个部分
         feat_list = []
@@ -569,9 +568,11 @@ class PointTransformerV2(nn.Module):
                     random_sample = torch.tensor(random_sample)
                     feat_list.append(torch.cat((feat[offset[i - 1]:offset[i],:],feat[random_sample + offset[i - 1].item(), :]), dim=0))
         
+        #以现在的网络，最后的Encoder输出是N*C的特征，N是点云的数量，C是特征的维度
+        feat_list = torch.stack(feat_list, dim=0)
         return feat_list
 
-
+    
     def load_pretrained_model(self):
         pretrained_dict = torch.load(self.checkpoint_path, map_location="cpu")
         model_dict = self.state_dict()
@@ -579,3 +580,19 @@ class PointTransformerV2(nn.Module):
         model_dict.update(pretrained_dict)
         self.load_state_dict(model_dict)
         print("Load pretrained model from {}".format(self.checkpoint_path)) 
+
+
+    def merge_batch(self, data_dict):
+        # data_dict是一个字典，字典中的每一个元素都是一个torch.Tensor
+        # 按照batch的维度对data_dict进行拼接
+        for key in data_dict:
+            if isinstance(data_dict[key], torch.Tensor):
+                data_dict[key] = data_dict[key].view(-1, *data_dict[key].shape[2:])
+
+        # 给offset中的数，每个数都加上前面所有batch的点的数量
+        if "offset" in data_dict.keys():
+            offset = data_dict["offset"]
+            offset = torch.cumsum(offset, dim=0)
+            data_dict["offset"] = offset
+        
+        return data_dict

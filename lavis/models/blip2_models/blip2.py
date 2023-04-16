@@ -93,7 +93,8 @@ class Blip2Base(BaseModel):
                                              checkpoint_path=pretrained_model_path,)
         else:
             raise KeyError("cloud encoder must be point_transformer")
-        ln_cloud = LayerNorm(cloud_encoder.num_features)
+        # TODO: 这个要根据point transformer的特征维度相应修改
+        ln_cloud = LayerNorm(384)
         return cloud_encoder, ln_cloud
 
     @classmethod
