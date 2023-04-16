@@ -43,7 +43,8 @@ class CloudCaptionBuilder(BaseDatasetBuilder):
             datasets[split] = dataset_cls(
                 vis_processor = vis_processor,
                 text_processor = text_processor,
-                text_prompt=""
+                text_prompt="",
+                path=ann_info[split].storage,
             )
 
         return datasets
