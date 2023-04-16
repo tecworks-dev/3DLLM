@@ -13,7 +13,7 @@
             "args": [
                 "--nproc_per_node=1",
                 "${workspaceFolder}/train_3d.py",
-                "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/pretrain_stage1.yaml",
+                "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/train/pretrain_stage1.yaml",
             ]
         },
         {
@@ -23,7 +23,7 @@
             "program": "${workspaceFolder}/train_3d.py",
             "justMyCode": true,
             "args": [
-                "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/pretrain_stage1.yaml",
+                "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/train/pretrain_stage1.yaml",
             ]
         }
     ]

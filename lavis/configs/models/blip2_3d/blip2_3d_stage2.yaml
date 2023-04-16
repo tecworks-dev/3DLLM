@@ -1,10 +1,10 @@
 model:
-  arch: point_cloud
+  arch: llama_chinese
   load_finetuned: False
-
-  # pretrained: ""
-  # finetuned: ""
-
+  pretrained: ""
+  finetuned: ""
+  
+  
   # point transformer encoder
   cloud_max_size: 10000
   drop_path_rate: 0
@@ -21,3 +21,7 @@ model:
   # Q-Former
   num_query_token: 32
   qformer_encoder_layer: 12
+
+  # Llama
+  llama_model: "llama_chinese"
+  pretrained_llama_path: ""
