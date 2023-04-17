@@ -41,7 +41,14 @@ text: `/public/public_data/3DLLM/str3d_text/` including train/test/val
 
 point cloud：
 
-text：`/public/public_data/3DLLM/merge/ZN-merge.json`
+train:`/public/public_data/3DLLM/merge/train/`
+
+test:`"/public/public_data/3DLLM/merge/val/`
+
+text：
+
+`/public/public_data/3DLLM/merge/ZN-merge.json`
+
 
 ## 已完成
 
