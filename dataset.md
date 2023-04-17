@@ -14,7 +14,13 @@ english + 房间类型: `"/public/public_data/3DLLM/s3dis_text/s3dis_text.json"`
 
 ## scannet
 
-point cloud: `/public/public_data/3DLLM/Scannet/`
+point cloud: 
+
+`/public/public_data/3DLLM/Scannet_original/ply/`
+
+`/public/public_data/3DLLM/Scannet_original/scannetply_train/`
+
+`/public/public_data/3DLLM/Scannet_original/scannetply_val/`
 
 text: 
 
@@ -30,6 +36,12 @@ text:
 point cloud:`/public/public_data/3DLLM/str3d_pc/pc/` including train/test/val
 
 text: `/public/public_data/3DLLM/str3d_text/` including train/test/val
+
+## 合并后的：
+
+point cloud：
+
+text：`/public/public_data/3DLLM/merge/ZN-merge.json`
 
 ## 已完成
 
