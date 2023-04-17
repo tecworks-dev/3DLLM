@@ -93,7 +93,8 @@ class RunnerBase:
                     )
             else:
                 self._wrapped_model = self._model
-
+        elif self._wrapped_model is None:
+            self._wrapped_model = self._model
         return self._wrapped_model
 
     @property
