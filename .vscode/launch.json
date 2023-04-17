@@ -5,11 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "test-multi-gpu",
+            "name": "train-multi-gpu-stage1",
             "type": "python",
             "request": "launch",
             "module": "torch.distributed.run",
             "justMyCode": true,
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "4,5,6,7",
+            },
             "args": [
                 "--nproc_per_node=1",
                 "${workspaceFolder}/train_3d.py",
@@ -17,13 +20,44 @@
             ]
         },
         {
-            "name": "test",
+            "name": "train-multi-gpu-stage2",
+            "type": "python",
+            "request": "launch",
+            "module": "torch.distributed.run",
+            "justMyCode": true,
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "4,5,6,7",
+            },
+            "args": [
+                "--nproc_per_node=1",
+                "${workspaceFolder}/train_3d.py",
+                "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/train/pretrain_stage2.yaml",
+            ]
+        },
+        {
+            "name": "train-stage1",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/train_3d.py",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "4,5,6,7",
+            },
             "justMyCode": true,
             "args": [
                 "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/train/pretrain_stage1.yaml",
+            ]
+        },
+        {
+            "name": "train-stage2",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train_3d.py",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "4,5,6,7",
+            },
+            "justMyCode": true,
+            "args": [
+                "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/train/pretrain_stage2.yaml",
             ]
         }
     ]

@@ -9,6 +9,7 @@ import random
 import einops
 from timm.models.layers import DropPath
 import pointops
+import logging
 
 # 从offset到batch的转换
 def offset2batch(offset):
@@ -581,7 +582,7 @@ class PointTransformerV2(nn.Module):
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
         model_dict.update(pretrained_dict)
         self.load_state_dict(model_dict)
-        print("Load pretrained model from {}".format(self.checkpoint_path)) 
+        logging.info("Load pretrained PointTransformer model from {}".format(self.checkpoint_path)) 
 
 
     def merge_batch(self, data_dict):
