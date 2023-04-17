@@ -14,7 +14,13 @@ english + 房间类型: `"/public/public_data/3DLLM/s3dis_text/s3dis_text.json"`
 
 ## scannet
 
-point cloud: `/public/public_data/3DLLM/Scannet/`
+point cloud: 
+
+`/public/public_data/3DLLM/Scannet_original/ply/`
+
+`/public/public_data/3DLLM/Scannet_original/scannetply_train/`
+
+`/public/public_data/3DLLM/Scannet_original/scannetply_val/`
 
 text: 
 
@@ -30,6 +36,12 @@ text:
 point cloud:`/public/public_data/3DLLM/str3d_pc/pc/` including train/test/val
 
 text: `/public/public_data/3DLLM/str3d_text/` including train/test/val
+
+## 合并后的：
+
+point cloud：
+
+text：`/public/public_data/3DLLM/merge/ZN-merge.json`
 
 ## 已完成
 
@@ -58,4 +70,9 @@ scannet:
 
 str3d:
 "  "/data3/rmq/scene_00003.ply": "有7个房间，包括1间客厅，1间厨房，2间卧室，1间浴室，1个阳台，1个书房，有7个门，有5个窗户，浴室和客厅有门连通。书房和客厅有门连通。阳台和客厅有门连通。客厅和厨房有门连通。卧室和客厅都有门连通。客厅和卧室都有连接。客厅向外连接。厨房有1个窗户，卧室有2个窗户。"
+
+5.合并s3dis和scannet数据集
+
+6.处理得到scannet点云pth数据
+
 ## 未完成
