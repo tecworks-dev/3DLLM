@@ -188,8 +188,13 @@ class AttrDict(dict):
 
 
 def setup_logger(log_folder:str=""):
+    # logging.basicConfig(
+    #     level=logging.INFO if dist_utils.is_main_process() else logging.WARN,
+    #     format="%(asctime)s [%(levelname)s] %(message)s",
+    #     handlers=[logging.StreamHandler(), logging.FileHandler(log_folder + "/log_test.txt")],
+    # )
     logging.basicConfig(
         level=logging.INFO if dist_utils.is_main_process() else logging.WARN,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[logging.StreamHandler(), logging.FileHandler(log_folder + "/log_test.txt")],
+        handlers=[logging.StreamHandler()],
     )

@@ -92,7 +92,7 @@ def main():
     output_dir = lib_root / cfg.run_cfg.output_dir / job_id
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    setup_logger(str(output_dir))
+    setup_logger()
 
     cfg.pretty_print()
 
