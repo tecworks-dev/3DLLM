@@ -4,7 +4,7 @@
 # For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
 
 model:
-  arch: blip2_3d_llama
+  arch: blip2_llama
   model_type: llama_chinese
   load_finetuned: False
   use_grad_checkpoint: True
