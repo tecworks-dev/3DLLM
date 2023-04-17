@@ -75,15 +75,15 @@ class Blip2Llama(Blip2Base):
 
         t1 = time.time()
         self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_model_path, use_fast=False)
-        # self.llama_model = LlamaForCausalLM.from_pretrained(llama_model_path, torch_dtype=torch.float32)
+        self.llama_model = LlamaForCausalLM.from_pretrained(llama_model_path, torch_dtype=torch.float16)
 
         # self.llama_model = LlamaForCausalLM(config=LlamaConfig())
-        self.llama_model = None
+        # self.llama_model = None
         logging.info("load llama model spend time: {:.4f} s".format(time.time() - t1))
-        # return 
+         
 
-        # for name, param in self.llama_model.named_parameters():
-        #     param.requires_grad = False
+        for name, param in self.llama_model.named_parameters():
+            param.requires_grad = False
         self.eos_token_id = self.llama_tokenizer(
             "\n", add_special_tokens=False
         ).input_ids[0]
