@@ -105,9 +105,9 @@ class Blip2Llama(Blip2Base):
         image = samples["cloud"]
         device = image["coord"].device
         with self.maybe_autocast():
-            fake_cloud_encoder_result = torch.rand(image["coord"].shape[0], 256, 384).to(device)        # [batch_size, 256, 384]
-            image_embeds = self.ln_cloud(fake_cloud_encoder_result)
-            # image_embeds = self.ln_cloud(self.cloud_encoder(image))
+            # fake_cloud_encoder_result = torch.rand(image["coord"].shape[0], 256, 384).to(device)        # [batch_size, 256, 384]
+            # image_embeds = self.ln_cloud(fake_cloud_encoder_result)
+            image_embeds = self.ln_cloud(self.cloud_encoder(image))
             
         image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(device)
 
@@ -191,6 +191,9 @@ class Blip2Llama(Blip2Base):
         image = samples["cloud"]
         device = image["coord"].device
         with self.maybe_autocast():
+            # fake_cloud_encoder_result = torch.rand(image["coord"].shape[0], 256, 384).to(device)        # [batch_size, 256, 384]
+            # image_embeds = self.ln_cloud(fake_cloud_encoder_result)
+
             image_embeds = self.ln_cloud(self.cloud_encoder(image))
             image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(device)
 
@@ -210,7 +213,7 @@ class Blip2Llama(Blip2Base):
             else:
                 prompt = self.prompt
 
-            prompt = [prompt] * image.size(0)
+            prompt = [prompt] * image_embeds.size(0)
 
             opt_tokens = self.llama_tokenizer(prompt, return_tensors="pt").to(device)
             input_ids = opt_tokens.input_ids

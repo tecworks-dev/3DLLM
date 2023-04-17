@@ -17,7 +17,7 @@ class PointCloudTextPretrainTask(BaseTask):
         super().__init__()
 
     # 对于第一阶段的训练来说, 验证没有什么直观的方法, 还得是计算loss, 只不过是在验证集上计算
-    def evaluation(self, model, data_loader, cuda_enabled=True):
+    def evaluation(self, model, data_loader, cuda_enabled=True) -> List[torch.Tensor]:
         # return
         total_steps = len(data_loader)
 
@@ -76,7 +76,7 @@ class PointCloudTextPretrainTaskStage2(BaseTask):
 
     # 对于第二阶段的训练来说, 验证的指标同样是计算loss, 和第一阶段的区别在于, 这一阶段可以生成文本了
     # 因此也要把文本保存下来
-    def evaluation(self, model, data_loader, cuda_enabled=True):
+    def evaluation(self, model, data_loader, cuda_enabled=True) -> Dict[str, any]:
         # return
         total_steps = len(data_loader)
 
