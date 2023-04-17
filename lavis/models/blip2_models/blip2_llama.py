@@ -277,7 +277,13 @@ class Blip2Llama(Blip2Base):
             point_cloud_encoder_pretrain_model_path = point_cloud_encoder_pretrain_model_path,
         )
 
-        if cfg.get("load_finetuned", False) or cfg.get("load_pretrained", False):
+        load_finetuned = cfg.get("load_finetuned", False)
+        load_pretrained = cfg.get("load_pretrained", False)
+        if(load_finetuned):
+            logging.info("load fintuned blip2_llama model from {}".format(cfg.get("finetuned", None)))
+            model.load_checkpoint_from_config(cfg)
+        elif(load_pretrained):
+            logging.info("load pretrained blip2_llama model from {}".format(cfg.get("pretrained", None)))
             model.load_checkpoint_from_config(cfg)
 
         return model
