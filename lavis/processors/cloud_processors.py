@@ -394,7 +394,7 @@ class ChineseCaptionProcessor(BaseProcessor):
         self.max_words = max_words
 
     def __call__(self, caption):
-        caption = self.prompt + self.pre_caption(caption)
+        caption = self.prompt + self.pre_caption(caption, self.max_words)
 
         return caption
     
@@ -408,7 +408,7 @@ class ChineseCaptionProcessor(BaseProcessor):
 
         return cls(prompt=prompt, max_words=max_words)
     
-    def pre_caption(self, caption):
+    def pre_caption(self, caption, max_words=50):
         # TODO 对中文caption进行预处理
         # 把开头、结尾的空格去掉
         caption = caption.strip()
@@ -416,6 +416,9 @@ class ChineseCaptionProcessor(BaseProcessor):
         caption = caption.replace("\r", "")
         # 把中间的空格都去掉
         caption = caption.replace(" ", "")
+        # 如果超出最大长度, 则截断
+        if len(caption) > max_words:
+            caption = caption[:max_words]
 
         return caption
 
@@ -450,7 +453,7 @@ class CloudTrainProcessor(BaseProcessor):
         # pcd_dict = SphereCrop(point_max=100000, mode='random')(pcd_dict)
 
         # 随机下采样是我自己实现的，而对于其他的数据变换方式是原来的PointTransformer2的代码
-        pcd_dict = RandomSample(max_num=80000)(pcd_dict)
+        pcd_dict = RandomSample(max_num=self.max_size)(pcd_dict)
         pcd_dict = CenterShift(apply_z=False)(pcd_dict)
         pcd_dict = NormalizeColor()(pcd_dict)
         pcd_dict = ToTensor()(pcd_dict)
@@ -490,7 +493,7 @@ class CloudTestProcessor(BaseProcessor):
         pcd_dict = Copy(keys_dict={"coord": "origin_coord", "label": "origin_label"})(pcd_dict)
         # pcd_dict = Voxelize(voxel_size=0.04, hash_type='fnv', mode='train',
         #             keys=("coord", "color", "label"), return_discrete_coord=True)(pcd_dict)
-        pcd_dict = RandomSample(max_num=80000)(pcd_dict)
+        pcd_dict = RandomSample(max_num=self.max_size)(pcd_dict)
         pcd_dict = CenterShift(apply_z=False)(pcd_dict)
         pcd_dict = NormalizeColor()(pcd_dict)
         pcd_dict = ToTensor()(pcd_dict)
