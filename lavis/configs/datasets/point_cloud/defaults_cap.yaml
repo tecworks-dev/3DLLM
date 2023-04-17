@@ -4,8 +4,8 @@ datasets:
     build_info:
       annotations:
         train:
-          storage:  "xxxxx.json"            # 这里放一个 json 文件，里面保存点云路径以及相对应的文本
-        test:
-          storage: "xxxxx.json"
-        val: 
-          storage: "xxxxx.json"
+          storage:  "/data3/rmq/points_text_datasets/S3DIS/text_embed/ZN-s3dis_text_absolute.json"            # 这里放一个 json 文件，里面保存点云路径以及相对应的文本
+        # test:
+        #   storage: "xxxxx.json"
+        # val: 
+        #   storage: "xxxxx.json"

@@ -22,7 +22,7 @@ from lavis.models.blip2_models.blip2 import (
 from lavis.models.blip_models.blip_outputs import BlipOutput, BlipOutputFeatures
 
 
-@registry.register_model("blip2")
+@registry.register_model("blip2_3d")
 @registry.register_model("blip2_feature_extractor")
 class Blip2Qformer(Blip2Base):
     """
@@ -37,39 +37,41 @@ class Blip2Qformer(Blip2Base):
     """
 
     PRETRAINED_MODEL_CONFIG_DICT = {
-        "pretrain": "configs/models/blip2/blip2_pretrain.yaml",
-        "pretrain_vitL": "configs/models/blip2/blip2_pretrain_vitL.yaml",
-        "coco": "configs/models/blip2/blip2_coco.yaml",
+        "blip2_3d_stage1": "configs/models/blip2_3d/blip2_3d_stage1.yaml",
     }
 
     def __init__(
         self,
-        vit_model="eva_clip_g",
-        img_size=224,
         drop_path_rate=0,
         use_grad_checkpoint=False,
-        vit_precision="fp16",
-        freeze_vit=True,
+        point_cloud_encoder_model = None,
+        freeze_point_cloud_encoder = True,
+        max_cloud_size = 10000,
         num_query_token=32,
         cross_attention_freq=2,
         embed_dim=256,
         max_txt_len=32,
+        qformer_encoder_layer=12,
+        point_cloud_encoder_pretrain_model_path = None,
     ):
         super().__init__()
 
         self.tokenizer = self.init_tokenizer()
 
-        self.visual_encoder, self.ln_vision = self.init_vision_encoder(
-            vit_model, img_size, drop_path_rate, use_grad_checkpoint, vit_precision
+        self.cloud_encoder, self.ln_cloud = self.init_cloud_encoder(
+            point_cloud_encoder_model, max_cloud_size, drop_path_rate, use_grad_checkpoint, point_cloud_encoder_pretrain_model_path
         )
-        if freeze_vit:
-            for name, param in self.visual_encoder.named_parameters():
+        if freeze_point_cloud_encoder:
+            for name, param in self.cloud_encoder.named_parameters():
                 param.requires_grad = False
-            self.visual_encoder = self.visual_encoder.eval()
-            self.visual_encoder.train = disabled_train
-            logging.info("freeze vision encoder")
+            self.cloud_encoder = self.cloud_encoder.eval()
+            self.cloud_encoder.train = disabled_train
+            logging.info("freeze point cloud encoder")
+
+        
+        # TODO : 不要固定为384 需要根据point cloud encoder的输出来确定
         self.Qformer, self.query_tokens = self.init_Qformer(
-            num_query_token, self.visual_encoder.num_features, cross_attention_freq
+            num_query_token, 384, cross_attention_freq, qformer_encoder_layer
         )
         self.Qformer.resize_token_embeddings(len(self.tokenizer))
         state_dict = self.Qformer.state_dict()
@@ -87,17 +89,18 @@ class Blip2Qformer(Blip2Base):
 
         self.max_txt_len = max_txt_len
 
+   
     def forward(self, samples):
-        image = samples["image"]
+        
+        image = samples["cloud"]
         text = samples["text_input"]
+        device = image["coord"].device
 
-        image_embeds = self.ln_vision(self.visual_encoder(image))
-        cloud_emdeds = self.ln_cloud(self.cloud_encoder(cloud))
-        image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(
-            image.device
-        )
+        image_embeds = self.ln_cloud(self.cloud_encoder(image))   # [B, N, C]
+        # cloud_emdeds = self.ln_cloud(self.cloud_encoder(cloud))
+        image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(device)  # [B, N]
 
-        query_tokens = self.query_tokens.expand(image_embeds.shape[0], -1, -1)
+        query_tokens = self.query_tokens.expand(image_embeds.shape[0], -1, -1)      # [32, 768] -> [B, 32, 768]
 
         query_output = self.Qformer.bert(
             query_embeds=query_tokens,
@@ -108,7 +111,7 @@ class Blip2Qformer(Blip2Base):
         )
 
         image_feats = F.normalize(
-            self.vision_proj(query_output.last_hidden_state), dim=-1
+            self.vision_proj(query_output.last_hidden_state), dim=-1        # [B, 32, 768] -> [B, 32, 256]
         )
 
         text_tokens = self.tokenizer(
@@ -117,24 +120,24 @@ class Blip2Qformer(Blip2Base):
             truncation=True,
             max_length=self.max_txt_len,
             return_tensors="pt",
-        ).to(image.device)
+        ).to(device)
         text_output = self.Qformer.bert(
             text_tokens.input_ids,
             attention_mask=text_tokens.attention_mask,
             return_dict=True,
         )
+        # text_output.last_hidden_state: [B, 32, 768] 其中的 [:, 0, :] 是 [CLS] token 对应的 hidden state, 因此用它作为整句话的特征表示
+        # [B, 768] -> [B, 256]
         text_feat = F.normalize(
             self.text_proj(text_output.last_hidden_state[:, 0, :]), dim=-1
         )
 
         ###============== Image-text Contrastive ===================###
-        image_feats_all = concat_all_gather(
-            image_feats
-        )  # [batch_size*num_gpu, num_query_tokens, embed_dim]
-        text_feat_all = concat_all_gather(text_feat)  # [batch_size*num_gpu, embed_dim]
+        image_feats_all = concat_all_gather(image_feats)  # [B*num_gpu, num_query_tokens, embed_dim]
+        text_feat_all = concat_all_gather(text_feat)  # [B*num_gpu, embed_dim]
 
         sim_q2t = torch.matmul(
-            image_feats.unsqueeze(1), text_feat_all.unsqueeze(-1)
+            image_feats.unsqueeze(1), text_feat_all.unsqueeze(-1)       # [B, 1, 32, 256] * [B*num_gpu, 256, 1] -> [B, B*num_gpu, 32, 1] -> [B, B*num_gpu, 32]
         ).squeeze()
         # [batch_size, batch_size*num_gpu, num_query_tokens]
 
@@ -144,7 +147,7 @@ class Blip2Qformer(Blip2Base):
 
         # text-query similarity: [batch_size, batch_size*num_gpu, num_query_tokens]
         sim_t2q = torch.matmul(
-            text_feat.unsqueeze(1).unsqueeze(1), image_feats_all.permute(0, 2, 1)
+            text_feat.unsqueeze(1).unsqueeze(1), image_feats_all.permute(0, 2, 1)   # [B, 1, 1, 256] * [B*num_gpu, 256, 32] -> [B, B*num_gpu, 1, 32] -> [B, B*num_gpu, 32]
         ).squeeze()
 
         # text-image similarity: aggregate across all query tokens
@@ -152,9 +155,10 @@ class Blip2Qformer(Blip2Base):
         sim_t2i = sim_t2i / self.temp  # [batch_size, batch_size*num_gpu]
 
         rank = dist.get_rank()
-        bs = image.size(0)
+        # bs = image.size(0)
+        bs = image_embeds.size(0)
         targets = torch.linspace(rank * bs, rank * bs + bs - 1, bs, dtype=int).to(
-            image.device
+            device
         )
 
         loss_itc = (
@@ -200,7 +204,7 @@ class Blip2Qformer(Blip2Base):
 
         query_tokens_itm = self.query_tokens.expand(text_ids_all.shape[0], -1, -1)
         query_atts_itm = torch.ones(query_tokens_itm.size()[:-1], dtype=torch.long).to(
-            image.device
+            device
         )
         attention_mask_all = torch.cat([query_atts_itm, text_atts_all], dim=1)
 
@@ -208,7 +212,7 @@ class Blip2Qformer(Blip2Base):
             [image_embeds, image_embeds_neg, image_embeds], dim=0
         )  # pos, neg, pos
         image_atts_all = torch.ones(image_embeds_all.size()[:-1], dtype=torch.long).to(
-            image.device
+            device
         )
 
         output_itm = self.Qformer.bert(
@@ -227,7 +231,7 @@ class Blip2Qformer(Blip2Base):
         itm_labels = torch.cat(
             [torch.ones(bs, dtype=torch.long), torch.zeros(2 * bs, dtype=torch.long)],
             dim=0,
-        ).to(image.device)
+        ).to(device)
         loss_itm = F.cross_entropy(logits, itm_labels)
 
         ##================= Image Captioning ========================##
@@ -238,7 +242,7 @@ class Blip2Qformer(Blip2Base):
         )
 
         query_atts = torch.ones(query_tokens.size()[:-1], dtype=torch.long).to(
-            image.device
+            device
         )
         attention_mask = torch.cat([query_atts, text_tokens.attention_mask], dim=1)
         lm_output = self.Qformer(
@@ -483,30 +487,33 @@ class Blip2Qformer(Blip2Base):
 
     @classmethod
     def from_config(cls, cfg):
-        vit_model = cfg.get("vit_model", "eva_clip_g")
-        img_size = cfg.get("image_size")
         num_query_token = cfg.get("num_query_token")
         cross_attention_freq = cfg.get("cross_attention_freq", 2)
 
         drop_path_rate = cfg.get("drop_path_rate", 0)
         use_grad_checkpoint = cfg.get("use_grad_checkpoint", False)
-        vit_precision = cfg.get("vit_precision", "fp16")
-        freeze_vit = cfg.get("freeze_vit", True)
 
         max_txt_len = cfg.get("max_txt_len", 32)
+        qformer_encoder_layer = cfg.get("qformer_encoder_layer", 12)
+        point_cloud_encoder_model = cfg.get("point_cloud_encoder_model", "point_transformer")
+        point_cloud_encoder_pretrain_model_path = cfg.get("point_cloud_encoder_model_path", None)
+        freeze_point_cloud_encoder = cfg.get("freeze_cloud_encoder", True)
 
+        # 这里就同时初始化了 Q-former 和 point cloud encoder
         model = cls(
-            vit_model=vit_model,
-            img_size=img_size,
             drop_path_rate=drop_path_rate,
             use_grad_checkpoint=use_grad_checkpoint,
-            vit_precision=vit_precision,
-            freeze_vit=freeze_vit,
+            point_cloud_encoder_model = point_cloud_encoder_model,
+            freeze_point_cloud_encoder = freeze_point_cloud_encoder,
             num_query_token=num_query_token,
             cross_attention_freq=cross_attention_freq,
             max_txt_len=max_txt_len,
+            qformer_encoder_layer=qformer_encoder_layer,
+            point_cloud_encoder_pretrain_model_path = point_cloud_encoder_pretrain_model_path,
         )
-        model.load_checkpoint_from_config(cfg)
+
+        if cfg.get("load_finetuned", False) or cfg.get("load_pretrained", False):
+            model.load_checkpoint_from_config(cfg)
 
         return model
 

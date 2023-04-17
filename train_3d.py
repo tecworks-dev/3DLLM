@@ -31,6 +31,8 @@ from lavis.processors import *
 from lavis.runners import *
 from lavis.tasks import *
 
+from pathlib import Path
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training")
@@ -85,7 +87,12 @@ def main():
     setup_seeds(cfg)
 
     # set after init_distributed_mode() to only log on master.
-    setup_logger()
+    lib_root = Path(registry.get_path("library_root"))
+
+    output_dir = lib_root / cfg.run_cfg.output_dir / job_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    setup_logger(str(output_dir))
 
     cfg.pretty_print()
 

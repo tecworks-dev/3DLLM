@@ -25,11 +25,14 @@ from lavis.models.eva_vit import create_eva_vit_g
 from lavis.models.clip_vit import create_clip_vit_L
 from transformers import BertTokenizer
 
+from lavis.models.blip2_models.PointTransformer import PointTransformerV2
+
 
 class Blip2Base(BaseModel):
     @classmethod
     def init_tokenizer(cls):
-        tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        # tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
         tokenizer.add_special_tokens({"bos_token": "[DEC]"})
         return tokenizer
 
@@ -44,13 +47,14 @@ class Blip2Base(BaseModel):
             return contextlib.nullcontext()
 
     @classmethod
-    def init_Qformer(cls, num_query_token, vision_width, cross_attention_freq=2):
+    def init_Qformer(cls, num_query_token, vision_width, cross_attention_freq=2, encoder_layer=12):
         encoder_config = BertConfig.from_pretrained("bert-base-uncased")
         encoder_config.encoder_width = vision_width
         # insert cross-attention layer every other block
         encoder_config.add_cross_attention = True
         encoder_config.cross_attention_freq = cross_attention_freq
         encoder_config.query_length = num_query_token
+        encoder_config.num_hidden_layers = encoder_layer
         Qformer = BertLMHeadModel.from_pretrained(
             "bert-base-uncased", config=encoder_config
         )
@@ -61,8 +65,37 @@ class Blip2Base(BaseModel):
         return Qformer, query_tokens
 
     @classmethod
-    def init_cloud_encoder(cls) :
-        cloud_encoder = PointTransformerEncoder(pretrain)
+    def init_cloud_encoder(cls, model_name, max_cloud_size, drop_path_rate, use_grad_checkpoint, pretrained_model_path = None,):
+        if (model_name == "point_transformer"):
+            cloud_encoder = PointTransformerV2(in_channels=6,
+                                             num_classes=13,
+                                             patch_embed_depth=2,
+                                             patch_embed_channels=48,
+                                             patch_embed_groups=6,
+                                             patch_embed_neighbours=16,
+                                             enc_depths=(2, 6, 2),
+                                             enc_channels=(96, 192, 384),
+                                             enc_groups=(12, 24, 48),
+                                             enc_neighbours=(16, 16, 16),
+                                             dec_depths=(1, 1, 1),
+                                             dec_channels=(48, 96, 192),
+                                             dec_groups=(6, 12, 24),
+                                             dec_neighbours=(16, 16, 16),
+                                             grid_sizes=(0.1, 0.2, 0.4),
+                                             attn_qkv_bias=True,
+                                             pe_multiplier=False,
+                                             pe_bias=True,
+                                             attn_drop_rate=0.,
+                                             drop_path_rate=0.3,
+                                             enable_checkpoint=False,
+                                             unpool_backend="interp",
+                                             num_features=256,
+                                             checkpoint_path=pretrained_model_path,)
+        else:
+            raise KeyError("cloud encoder must be point_transformer")
+        # TODO: 这个要根据point transformer的特征维度相应修改
+        ln_cloud = LayerNorm(384)
+        return cloud_encoder, ln_cloud
 
     @classmethod
     def init_vision_encoder(

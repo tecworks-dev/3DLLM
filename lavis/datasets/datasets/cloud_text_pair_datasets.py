@@ -66,6 +66,8 @@ class CloudTextPairDataset(BaseDataset):
         cloud = self.vis_processor(cloud)
         caption = self.text_processor(caption)
 
+        return {"cloud": cloud, "text_input": caption}
+
         image = torch.ones((3, 224, 224))
 
         return {"image": image, "text_input": caption}

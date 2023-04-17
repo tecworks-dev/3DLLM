@@ -65,6 +65,11 @@ def apply_to_sample(f, sample):
 
     return _apply(sample)
 
+def move_to_cpu(sample):
+    def _move_to_cpu(tensor):
+        return tensor.cpu()
+
+    return apply_to_sample(_move_to_cpu, sample)
 
 def move_to_cuda(sample):
     def _move_to_cuda(tensor):
@@ -76,6 +81,8 @@ def move_to_cuda(sample):
 def prepare_sample(samples, cuda_enabled=True):
     if cuda_enabled:
         samples = move_to_cuda(samples)
+    else:
+        samples = move_to_cpu(samples)
 
     # TODO fp16 support
 
