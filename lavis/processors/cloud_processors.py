@@ -499,7 +499,7 @@ class CloudTestProcessor(BaseProcessor):
         pcd_dict = ToTensor()(pcd_dict)
         pcd_dict = Collect(keys=("coord", "color", "label"), feat_keys=["coord", "color"])(pcd_dict)
 
-        return point_cloud 
+        return pcd_dict 
     
     @classmethod
     def from_config(cls, cfg=None):
