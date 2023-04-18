@@ -42,7 +42,7 @@
  chair
  "9": 9,
  bookcase   
- "10": 6,
+ "10": 5,
  sofa   
  "11": 23,
  board   

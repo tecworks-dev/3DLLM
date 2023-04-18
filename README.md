@@ -30,7 +30,7 @@ tdt(环境名称pointcept)、 rmq(环境名称pointformer)
 好像不能debug
 
 ```txt
-ip:172.18.36.7
+ip:172.18.36.75
 port:22
 ```
 
