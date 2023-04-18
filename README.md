@@ -30,7 +30,7 @@ tdt(环境名称pointcept)、 rmq(环境名称pointformer)
 好像不能debug
 
 ```txt
-ip:172.18.36.7
+ip:172.18.36.75
 port:22
 ```
 
@@ -52,8 +52,33 @@ port:22
 
 #### 数据存储
 
-```txt
-/public/public_data/3DLLM
+[dataset.md](https://github.com/rongmq8802/3DLLM/blob/main/dataset.md)
+
+#### 项目修改
+
+[codechange.md](https://github.com/rongmq8802/3DLLM/blob/main/CodeChange.md)
+
+
+#### 代码流程
+
+[代码流程.md](https://github.com/rongmq8802/3DLLM/blob/main/%E4%BB%A3%E7%A0%81%E6%B5%81%E7%A8%8B.md)
+
+## 工具代码
+
+### :cat: llama原版weight转huggin face格式
+
+#### 创建环境
+
+```bash
+pip install transformers
+pip install accelerate
+pip install protobuf==3.20.0
+```
+
+#### 使用
+
+```bash
+python transform.py --input_dir "llama_weight_dir" --model_size "X"B --output_dir "output_dir"
 ```
 
 # 运行代码
