@@ -29,6 +29,7 @@ class Blip2Llama(Blip2Base):
 
     PRETRAINED_MODEL_CONFIG_DICT = {
         "blip2_3d_stage2": "configs/models/blip2_3d/blip2_3d_stage2.yaml",
+        "blip2_3d_caption": "configs/models/blip2_3d/blip2_3d_caption.yaml",
     }
 
     def __init__(
@@ -76,17 +77,14 @@ class Blip2Llama(Blip2Base):
         t1 = time.time()
         self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_model_path, use_fast=False)
         self.llama_model = LlamaForCausalLM.from_pretrained(llama_model_path, torch_dtype=torch.float16)
-
-        # self.llama_model = LlamaForCausalLM(config=LlamaConfig())
         # self.llama_model = None
         logging.info("load llama model spend time: {:.4f} s".format(time.time() - t1))
          
-
-        for name, param in self.llama_model.named_parameters():
-            param.requires_grad = False
-        self.eos_token_id = self.llama_tokenizer(
-            "\n", add_special_tokens=False
-        ).input_ids[0]
+        if self.llama_model is not None:
+            for name, param in self.llama_model.named_parameters():
+                param.requires_grad = False
+        # 给的 llama-Chinese 模型中使用的是 </s> 作为结束符
+        self.eos_token_id = self.llama_tokenizer("</s>", add_special_tokens=False).input_ids[0]
 
         # self.opt_proj = nn.Linear(
         #     self.Qformer.config.hidden_size, self.llama_model.config.hidden_size
@@ -177,7 +175,10 @@ class Blip2Llama(Blip2Base):
         """
         Args:
             samples (dict): A dictionary containing the following keys:
-                - image (torch.Tensor): A tensor of shape (batch_size, 3, H, W)
+                - cloud (dict) : A dictionary containing the following keys:
+                    - coord (Tensor): The coordinates of the points in the point cloud. The shape is [B, N, 3].
+                    - color (Tensor): The colors of the points in the point cloud. The shape is [B, N, 3].
+                text_input (str): prompt text, it will be used in each cloud in the batch
             use_nucleus_sampling (bool): Whether to use nucleus sampling. If False, use top-k sampling.
             num_beams (int): Number of beams for beam search. 1 means no beam search.
             max_length (int): The maximum length of the sequence to be generated.
@@ -208,16 +209,16 @@ class Blip2Llama(Blip2Base):
             inputs_opt = self.opt_proj(query_output.last_hidden_state)
             atts_opt = torch.ones(inputs_opt.size()[:-1], dtype=torch.long).to(device)
 
-            if "prompt" in samples.keys():
-                prompt = samples["prompt"]
+            if "text_input" in samples.keys():
+                prompt = samples["text_input"]
             else:
                 prompt = self.prompt
 
             prompt = [prompt] * image_embeds.size(0)
 
-            opt_tokens = self.llama_tokenizer(prompt, return_tensors="pt").to(device)
-            input_ids = opt_tokens.input_ids
-            attention_mask = torch.cat([atts_opt, opt_tokens.attention_mask], dim=1)
+            llama_tokens = self.llama_tokenizer(prompt, return_tensors="pt").to(device)
+            input_ids = llama_tokens.input_ids
+            attention_mask = torch.cat([atts_opt, llama_tokens.attention_mask], dim=1)
 
             if use_nucleus_sampling:
                 query_embeds = inputs_opt.repeat_interleave(num_captions, dim=0)
@@ -227,7 +228,7 @@ class Blip2Llama(Blip2Base):
 
             outputs = self.llama_model.generate(
                 input_ids=input_ids,
-                query_embeds=query_embeds,
+                inputs_embeds=query_embeds,
                 attention_mask=attention_mask,
                 do_sample=use_nucleus_sampling,
                 top_p=top_p,
@@ -241,7 +242,7 @@ class Blip2Llama(Blip2Base):
                 num_return_sequences=num_captions,
             )
 
-            prompt_length = opt_tokens.input_ids.shape[1]
+            prompt_length = llama_tokens.input_ids.shape[1]
             output_text = self.llama_tokenizer.batch_decode(
                 outputs[:, prompt_length:], skip_special_tokens=True
             )

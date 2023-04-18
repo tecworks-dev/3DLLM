@@ -16,10 +16,16 @@ logging.basicConfig(
         handlers=[logging.StreamHandler()],
     )
 
-device = torch.device("cuda")
+# 从命令行读取参数
+parser = argparse.ArgumentParser()
+parser.add_argument("--device", type=str, default="cuda", help="")
+args = parser.parse_args()
+
+
+device = torch.device(args.device)
 
 model, vis_processors, _ = load_model_and_preprocess(
-    name="blip2_llama", model_type="blip2_3d_stage2", is_eval=True, device=device
+    name="blip2_llama", model_type="blip2_3d_caption", is_eval=True, device=device
 )
 
 
