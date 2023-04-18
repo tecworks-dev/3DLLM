@@ -68,7 +68,7 @@
         # 随机下采样是我自己实现的，而对于其他的数据变换方式是原来的PointTransformer2的代码
         pcd_dict = RandomSample(max_num=self.max_size)(pcd_dict)        
         pcd_dict = CenterShift(apply_z=True)(pcd_dict)
-        pcd_dict = RandomDropout(dropout_ratio=0.2, dropout_application_ratio=0.2)(pcd_dict)
+        # pcd_dict = RandomDropout(dropout_ratio=0.2, dropout_application_ratio=0.2)(pcd_dict)
         pcd_dict = RandomRotate(angle=[-1, 1], axis='z', center=[0, 0, 0], p=0.5)(pcd_dict)
         pcd_dict = RandomRotate(angle=[-1/64, 1/64], axis='x', p=0.5)(pcd_dict)
         pcd_dict = RandomRotate(angle=[-1/64, 1/64], axis='y', p=0.5)(pcd_dict)
