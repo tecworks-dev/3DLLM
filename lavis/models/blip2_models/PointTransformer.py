@@ -413,7 +413,7 @@ class GVAPatchEmbed(nn.Module):
 class PointTransformerV2(nn.Module):
     def __init__(self,
                  in_channels,
-                 num_classes,
+                #  num_classes,
                  patch_embed_depth=1,
                  patch_embed_channels=48,
                  patch_embed_groups=6,
@@ -422,10 +422,10 @@ class PointTransformerV2(nn.Module):
                  enc_channels=(96, 192, 384, 512),
                  enc_groups=(12, 24, 48, 64),
                  enc_neighbours=(16, 16, 16, 16),
-                 dec_depths=(1, 1, 1, 1),
-                 dec_channels=(48, 96, 192, 384),
-                 dec_groups=(6, 12, 24, 48),
-                 dec_neighbours=(16, 16, 16, 16),
+                #  dec_depths=(1, 1, 1, 1),
+                #  dec_channels=(48, 96, 192, 384),
+                #  dec_groups=(6, 12, 24, 48),
+                #  dec_neighbours=(16, 16, 16, 16),
                  grid_sizes=(0.06, 0.12, 0.24, 0.48),
                  attn_qkv_bias=True,
                  pe_multiplier=False,
@@ -439,17 +439,16 @@ class PointTransformerV2(nn.Module):
                  ):
         super(PointTransformerV2, self).__init__()
         self.in_channels = in_channels
-        self.num_classes = num_classes
         self.num_stages = len(enc_depths)
         self.num_features = num_features
         self.checkpoint_path = checkpoint_path
-        assert self.num_stages == len(dec_depths)
+        # assert self.num_stages == len(dec_depths)
         assert self.num_stages == len(enc_channels)
-        assert self.num_stages == len(dec_channels)
+        # assert self.num_stages == len(dec_channels)
         assert self.num_stages == len(enc_groups)
-        assert self.num_stages == len(dec_groups)
+        # assert self.num_stages == len(dec_groups)
         assert self.num_stages == len(enc_neighbours)
-        assert self.num_stages == len(dec_neighbours)
+        # assert self.num_stages == len(dec_neighbours)
         assert self.num_stages == len(grid_sizes)
         self.patch_embed = GVAPatchEmbed(
             in_channels=in_channels,
@@ -465,16 +464,16 @@ class PointTransformerV2(nn.Module):
         )
 
         enc_dp_rates = [x.item() for x in torch.linspace(0, drop_path_rate, sum(enc_depths))]
-        dec_dp_rates = [x.item() for x in torch.linspace(0, drop_path_rate, sum(dec_depths))]
-        enc_channels = [patch_embed_channels] + list(enc_channels)
-        dec_channels = list(dec_channels) + [enc_channels[-1]]
+        # dec_dp_rates = [x.item() for x in torch.linspace(0, drop_path_rate, sum(dec_depths))]
+        self.enc_channels = [patch_embed_channels] + list(enc_channels)
+        # dec_channels = list(dec_channels) + [self.enc_channels[-1]]
         self.enc_stages = nn.ModuleList()
-        self.dec_stages = nn.ModuleList()
+        # self.dec_stages = nn.ModuleList()
         for i in range(self.num_stages):
             enc = Encoder(
                 depth=enc_depths[i],
-                in_channels=enc_channels[i],
-                embed_channels=enc_channels[i + 1],
+                in_channels=self.enc_channels[i],
+                embed_channels=self.enc_channels[i + 1],
                 groups=enc_groups[i],
                 grid_size=grid_sizes[i],
                 neighbours=enc_neighbours[i],
@@ -485,29 +484,29 @@ class PointTransformerV2(nn.Module):
                 drop_path_rate=enc_dp_rates[sum(enc_depths[:i]):sum(enc_depths[:i + 1])],
                 enable_checkpoint=enable_checkpoint
             )
-            dec = Decoder(
-                depth=dec_depths[i],
-                in_channels=dec_channels[i + 1],
-                skip_channels=enc_channels[i],
-                embed_channels=dec_channels[i],
-                groups=dec_groups[i],
-                neighbours=dec_neighbours[i],
-                qkv_bias=attn_qkv_bias,
-                pe_multiplier=pe_multiplier,
-                pe_bias=pe_bias,
-                attn_drop_rate=attn_drop_rate,
-                drop_path_rate=dec_dp_rates[sum(dec_depths[:i]):sum(dec_depths[:i + 1])],
-                enable_checkpoint=enable_checkpoint,
-                unpool_backend=unpool_backend
-            )
+            # dec = Decoder(
+            #     depth=dec_depths[i],
+            #     in_channels=dec_channels[i + 1],
+            #     skip_channels=enc_channels[i],
+            #     embed_channels=dec_channels[i],
+            #     groups=dec_groups[i],
+            #     neighbours=dec_neighbours[i],
+            #     qkv_bias=attn_qkv_bias,
+            #     pe_multiplier=pe_multiplier,
+            #     pe_bias=pe_bias,
+            #     attn_drop_rate=attn_drop_rate,
+            #     drop_path_rate=dec_dp_rates[sum(dec_depths[:i]):sum(dec_depths[:i + 1])],
+            #     enable_checkpoint=enable_checkpoint,
+            #     unpool_backend=unpool_backend
+            # )
             self.enc_stages.append(enc)
-            self.dec_stages.append(dec)
-        self.seg_head = nn.Sequential(
-            nn.Linear(dec_channels[0], dec_channels[0]),
-            PointBatchNorm(dec_channels[0]),
-            nn.ReLU(inplace=True),
-            nn.Linear(dec_channels[0], num_classes)
-        ) if num_classes > 0 else nn.Identity()
+            # self.dec_stages.append(dec)
+        # self.seg_head = nn.Sequential(
+        #     nn.Linear(dec_channels[0], dec_channels[0]),
+        #     PointBatchNorm(dec_channels[0]),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(dec_channels[0], num_classes)
+        # ) if num_classes > 0 else nn.Identity()
 
         if self.checkpoint_path is not None:
             self.load_pretrained_model()
@@ -576,13 +575,32 @@ class PointTransformerV2(nn.Module):
         return feat_list
 
     
+    # def load_pretrained_model(self):
+    #     pretrained_dict = torch.load(self.checkpoint_path, map_location="cpu")
+    #     model_dict = self.state_dict()
+    #     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+    #     model_dict.update(pretrained_dict)
+    #     self.load_state_dict(model_dict)
+    #     logging.info("Load pretrained PointTransformer model from {}".format(self.checkpoint_path)) 
+
     def load_pretrained_model(self):
-        pretrained_dict = torch.load(self.checkpoint_path, map_location="cpu")
-        model_dict = self.state_dict()
-        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-        model_dict.update(pretrained_dict)
-        self.load_state_dict(model_dict)
-        logging.info("Load pretrained PointTransformer model from {}".format(self.checkpoint_path)) 
+        state_dict = torch.load(self.checkpoint_path, map_location="cpu")
+        state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+        
+        # print(self.state_dict().keys())
+        #判断model的模型参数和预训练的模型参数是否完全一致
+        for key in self.state_dict().keys():
+            # 如果key不在预训练模型的参数中，并且key不是以seg_head和dec_stages开头的参数
+            if key not in state_dict.keys() and not key.startswith("seg_head") and not key.startswith("dec_stages"):
+                print("key {} is not in pretrained model".format(key))
+
+        
+        # 删除不需要的参数
+        for key in list(state_dict.keys()):
+            if key.startswith("seg_head") or key.startswith("dec_stages"):
+                del state_dict[key]
+        self.load_state_dict(state_dict)
+        print("Load pretrained model from {}".format(self.checkpoint_path))
 
 
     def merge_batch(self, data_dict):

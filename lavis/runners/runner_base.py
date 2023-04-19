@@ -399,7 +399,9 @@ class RunnerBase:
             else:
                 # if no validation split is provided, we just save the checkpoint at the end of each epoch.
                 if not self.evaluate_only:
-                    self._save_checkpoint(cur_epoch, is_best=False)
+                    # 在没有验证集的情况下，每2个epoch保存一次模型
+                    if(cur_epoch % 2 == 0):
+                        self._save_checkpoint(cur_epoch, is_best=False)
 
             if self.evaluate_only:
                 break

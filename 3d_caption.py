@@ -9,6 +9,7 @@ from lavis.models import load_model_and_preprocess
 from lavis.common.registry import registry
 
 import logging 
+import argparse
 
 logging.basicConfig(
         level=logging.INFO,

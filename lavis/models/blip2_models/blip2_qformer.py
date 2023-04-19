@@ -71,7 +71,7 @@ class Blip2Qformer(Blip2Base):
         
         # TODO : 不要固定为384 需要根据point cloud encoder的输出来确定
         self.Qformer, self.query_tokens = self.init_Qformer(
-            num_query_token, 384, cross_attention_freq, qformer_encoder_layer
+            num_query_token, self.cloud_encoder.enc_channels[-1], cross_attention_freq, qformer_encoder_layer
         )
         self.Qformer.resize_token_embeddings(len(self.tokenizer))
         state_dict = self.Qformer.state_dict()

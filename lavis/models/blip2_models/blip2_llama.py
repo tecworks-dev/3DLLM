@@ -222,17 +222,19 @@ class Blip2Llama(Blip2Base):
             prompt = [prompt] * image_embeds.size(0)
 
             llama_tokens = self.llama_tokenizer(prompt, return_tensors="pt").to(device)
-            input_ids = llama_tokens.input_ids
+
+            inputs_embeds = self.llama_model.model.embed_tokens(llama_tokens.input_ids)
+            inputs_embeds = torch.cat([inputs_opt, inputs_embeds], dim=1)
             attention_mask = torch.cat([atts_opt, llama_tokens.attention_mask], dim=1)
 
             if use_nucleus_sampling:
-                query_embeds = inputs_opt.repeat_interleave(num_captions, dim=0)
+                query_embeds = inputs_embeds.repeat_interleave(num_captions, dim=0)
                 num_beams = 1
             else:
-                query_embeds = inputs_opt.repeat_interleave(num_beams, dim=0)
+                query_embeds = inputs_embeds.repeat_interleave(num_beams, dim=0)
 
             generated_ids = self.llama_model.generate(
-                input_ids,
+                llama_tokens.input_ids,
                 inputs_embeds=query_embeds,
                 attention_mask=attention_mask,
                 max_new_tokens=max_length,
