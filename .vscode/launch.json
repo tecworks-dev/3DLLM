@@ -59,6 +59,19 @@
             "args": [
                 "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/train/pretrain_stage2.yaml",
             ]
+        },
+        {
+            "name": "caption",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train_3d.py",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "6,7",
+            },
+            "justMyCode": true,
+            "args": [
+                "--cfg-path", "/home/tdt/3DLLM/lavis/projects/blip2_3d/train/train_caption.yaml",
+            ]
         }
     ]
 }

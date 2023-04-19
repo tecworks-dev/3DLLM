@@ -67,34 +67,34 @@ class Blip2Base(BaseModel):
     @classmethod
     def init_cloud_encoder(cls, model_name, max_cloud_size, drop_path_rate, use_grad_checkpoint, pretrained_model_path = None,):
         if (model_name == "point_transformer"):
-            cloud_encoder = PointTransformerV2(in_channels=6,
-                                             num_classes=13,
-                                             patch_embed_depth=2,
+             cloud_encoder = PointTransformerV2(in_channels=6,
+                                            #  num_classes=20,
+                                             patch_embed_depth=1,
                                              patch_embed_channels=48,
                                              patch_embed_groups=6,
-                                             patch_embed_neighbours=16,
-                                             enc_depths=(2, 6, 2),
-                                             enc_channels=(96, 192, 384),
-                                             enc_groups=(12, 24, 48),
-                                             enc_neighbours=(16, 16, 16),
-                                             dec_depths=(1, 1, 1),
-                                             dec_channels=(48, 96, 192),
-                                             dec_groups=(6, 12, 24),
-                                             dec_neighbours=(16, 16, 16),
-                                             grid_sizes=(0.1, 0.2, 0.4),
+                                             patch_embed_neighbours=8,
+                                             enc_depths=(2, 2, 6, 2),
+                                             enc_channels=(96, 192, 384, 512),
+                                             enc_groups=(12, 24, 48, 64),
+                                             enc_neighbours=(16, 16, 16, 16),
+                                            #  dec_depths=(1, 1, 1, 1),
+                                            #  dec_channels=(48, 96, 192, 384),
+                                            #  dec_groups=(6, 12, 24, 48),
+                                            #  dec_neighbours=(16, 16, 16, 16),
+                                             grid_sizes=(0.06, 0.15, 0.375, 0.9375),
                                              attn_qkv_bias=True,
                                              pe_multiplier=False,
                                              pe_bias=True,
                                              attn_drop_rate=0.,
                                              drop_path_rate=0.3,
                                              enable_checkpoint=False,
-                                             unpool_backend="interp",
+                                             unpool_backend="map",
                                              num_features=256,
                                              checkpoint_path=pretrained_model_path,)
         else:
             raise KeyError("cloud encoder must be point_transformer")
         # TODO: 这个要根据point transformer的特征维度相应修改
-        ln_cloud = LayerNorm(384)
+        ln_cloud = LayerNorm(cloud_encoder.enc_channels[-1])
         return cloud_encoder, ln_cloud
 
     @classmethod

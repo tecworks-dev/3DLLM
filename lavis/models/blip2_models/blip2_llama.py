@@ -16,9 +16,9 @@ import torch.nn as nn
 
 from lavis.common.registry import registry
 from lavis.models.blip2_models.blip2 import Blip2Base, disabled_train
-from lavis.models.blip2_models.modeling_opt import OPTForCausalLM, OPTConfig
-from transformers import AutoTokenizer
-from transformers import LlamaConfig, LlamaModel, LlamaForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import lavis.models.blip2_models.llama as llama
+# from transformers import LlamaConfig, LlamaModel, LlamaForCausalLM
 import time
 
 @registry.register_model("blip2_llama")
@@ -29,6 +29,7 @@ class Blip2Llama(Blip2Base):
 
     PRETRAINED_MODEL_CONFIG_DICT = {
         "blip2_3d_stage2": "configs/models/blip2_3d/blip2_3d_stage2.yaml",
+        "blip2_3d_caption": "configs/models/blip2_3d/blip2_3d_caption.yaml",
     }
 
     def __init__(
@@ -74,19 +75,19 @@ class Blip2Llama(Blip2Base):
             layer.intermediate = None
 
         t1 = time.time()
-        self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_model_path, use_fast=False)
-        # self.llama_model = LlamaForCausalLM.from_pretrained(llama_model_path, torch_dtype=torch.float32)
-
-        # self.llama_model = LlamaForCausalLM(config=LlamaConfig())
-        self.llama_model = None
+        config = llama.LLaMAConfig.from_pretrained(llama_model_path)
+        self.llama_tokenizer = llama.LLaMATokenizer.from_pretrained(llama_model_path)
+        self.llama_model = llama.LLaMAForCausalLM.from_pretrained(llama_model_path, torch_dtype=torch.float16, config=config, state_dict=None)
+        # self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_model_path, use_fast=False)
+        # self.llama_model = LlamaForCausalLM.from_pretrained(llama_model_path, torch_dtype=torch.float16)
+        # self.llama_model = None
         logging.info("load llama model spend time: {:.4f} s".format(time.time() - t1))
-        # return 
-
-        # for name, param in self.llama_model.named_parameters():
-        #     param.requires_grad = False
-        self.eos_token_id = self.llama_tokenizer(
-            "\n", add_special_tokens=False
-        ).input_ids[0]
+         
+        if self.llama_model is not None:
+            for name, param in self.llama_model.named_parameters():
+                param.requires_grad = False
+        # 给的 llama-Chinese 模型中使用的是 </s> 作为结束符
+        self.eos_token_id = self.llama_tokenizer("</s>", add_special_tokens=False).input_ids[0]
 
         # self.opt_proj = nn.Linear(
         #     self.Qformer.config.hidden_size, self.llama_model.config.hidden_size
@@ -105,9 +106,9 @@ class Blip2Llama(Blip2Base):
         image = samples["cloud"]
         device = image["coord"].device
         with self.maybe_autocast():
-            fake_cloud_encoder_result = torch.rand(image["coord"].shape[0], 256, 384).to(device)        # [batch_size, 256, 384]
-            image_embeds = self.ln_cloud(fake_cloud_encoder_result)
-            # image_embeds = self.ln_cloud(self.cloud_encoder(image))
+            # fake_cloud_encoder_result = torch.rand(image["coord"].shape[0], 256, 384).to(device)        # [batch_size, 256, 384]
+            # image_embeds = self.ln_cloud(fake_cloud_encoder_result)
+            image_embeds = self.ln_cloud(self.cloud_encoder(image))
             
         image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(device)
 
@@ -122,7 +123,7 @@ class Blip2Llama(Blip2Base):
         inputs_opt = self.opt_proj(query_output.last_hidden_state)
         atts_opt = torch.ones(inputs_opt.size()[:-1], dtype=torch.long).to(device)
 
-        self.llama_tokenizer.padding_side = "right"
+        self.llama_tokenizer.padding_side = "left"
 
         text = [t + "\n" for t in samples["text_input"]]
 
@@ -165,19 +166,24 @@ class Blip2Llama(Blip2Base):
         self,
         samples,
         use_nucleus_sampling=False,
-        num_beams=5,
+        num_beams=1,
         max_length=30,
         min_length=1,
-        top_p=0.9,
+        top_p=0.95,
+        top_k=50,
+        no_repeat_ngram_size=6,
         repetition_penalty=1.0,
         length_penalty=1.0,
         num_captions=1,
-        temperature=1,
+        temperature=0.7,
     ):
         """
         Args:
             samples (dict): A dictionary containing the following keys:
-                - image (torch.Tensor): A tensor of shape (batch_size, 3, H, W)
+                - cloud (dict) : A dictionary containing the following keys:
+                    - coord (Tensor): The coordinates of the points in the point cloud. The shape is [B, N, 3].
+                    - color (Tensor): The colors of the points in the point cloud. The shape is [B, N, 3].
+                text_input (str): prompt text, it will be used in each cloud in the batch
             use_nucleus_sampling (bool): Whether to use nucleus sampling. If False, use top-k sampling.
             num_beams (int): Number of beams for beam search. 1 means no beam search.
             max_length (int): The maximum length of the sequence to be generated.
@@ -191,7 +197,10 @@ class Blip2Llama(Blip2Base):
         image = samples["cloud"]
         device = image["coord"].device
         with self.maybe_autocast():
-            image_embeds = self.ln_cloud(self.cloud_encoder(image))
+            fake_cloud_encoder_result = torch.rand(image["coord"].shape[0], 256, 384).to(device)        # [batch_size, 256, 384]
+            image_embeds = self.ln_cloud(fake_cloud_encoder_result)
+
+            # image_embeds = self.ln_cloud(self.cloud_encoder(image))
             image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(device)
 
             query_tokens = self.query_tokens.expand(image_embeds.shape[0], -1, -1)
@@ -205,40 +214,57 @@ class Blip2Llama(Blip2Base):
             inputs_opt = self.opt_proj(query_output.last_hidden_state)
             atts_opt = torch.ones(inputs_opt.size()[:-1], dtype=torch.long).to(device)
 
-            if "prompt" in samples.keys():
-                prompt = samples["prompt"]
+            if "text_input" in samples.keys():
+                prompt = samples["text_input"]
             else:
                 prompt = self.prompt
 
-            prompt = [prompt] * image.size(0)
+            prompt = [prompt] * image_embeds.size(0)
 
-            opt_tokens = self.llama_tokenizer(prompt, return_tensors="pt").to(device)
-            input_ids = opt_tokens.input_ids
-            attention_mask = torch.cat([atts_opt, opt_tokens.attention_mask], dim=1)
+            llama_tokens = self.llama_tokenizer(prompt, return_tensors="pt").to(device)
+
+            inputs_embeds = self.llama_model.model.embed_tokens(llama_tokens.input_ids)
+            inputs_embeds = torch.cat([inputs_opt, inputs_embeds], dim=1)
+            attention_mask = torch.cat([atts_opt, llama_tokens.attention_mask], dim=1)
 
             if use_nucleus_sampling:
-                query_embeds = inputs_opt.repeat_interleave(num_captions, dim=0)
+                query_embeds = inputs_embeds.repeat_interleave(num_captions, dim=0)
                 num_beams = 1
             else:
-                query_embeds = inputs_opt.repeat_interleave(num_beams, dim=0)
+                query_embeds = inputs_embeds.repeat_interleave(num_beams, dim=0)
 
-            outputs = self.llama_model.generate(
-                input_ids=input_ids,
-                query_embeds=query_embeds,
+            generated_ids = self.llama_model.generate(
+                llama_tokens.input_ids,
+                inputs_embeds=query_embeds,
                 attention_mask=attention_mask,
-                do_sample=use_nucleus_sampling,
-                top_p=top_p,
-                temperature=temperature,
-                num_beams=num_beams,
                 max_new_tokens=max_length,
-                min_length=min_length,
-                eos_token_id=self.eos_token_id,
-                repetition_penalty=repetition_penalty,
-                length_penalty=length_penalty,
-                num_return_sequences=num_captions,
+                do_sample = use_nucleus_sampling,
+                num_beams = num_beams,
+                top_k = top_k,
+                top_p = top_p,
+                temperature = temperature,
+                no_repeat_ngram_size = no_repeat_ngram_size,
             )
+            results = self.llama_tokenizer.batch_decode(generated_ids, skip_special_tokens=True, spaces_between_special_tokens=False)
+            return results
 
-            prompt_length = opt_tokens.input_ids.shape[1]
+            # outputs = self.llama_model.generate(
+            #     input_ids=input_ids,
+            #     inputs_embeds=query_embeds,
+            #     attention_mask=attention_mask,
+            #     do_sample=use_nucleus_sampling,
+            #     top_p=top_p,
+            #     temperature=temperature,
+            #     num_beams=num_beams,
+            #     max_new_tokens=max_length,
+            #     min_length=min_length,
+            #     eos_token_id=self.eos_token_id,
+            #     repetition_penalty=repetition_penalty,
+            #     length_penalty=length_penalty,
+            #     num_return_sequences=num_captions,
+            # )
+
+            prompt_length = llama_tokens.input_ids.shape[1]
             output_text = self.llama_tokenizer.batch_decode(
                 outputs[:, prompt_length:], skip_special_tokens=True
             )
@@ -274,7 +300,13 @@ class Blip2Llama(Blip2Base):
             point_cloud_encoder_pretrain_model_path = point_cloud_encoder_pretrain_model_path,
         )
 
-        if cfg.get("load_finetuned", False) or cfg.get("load_pretrained", False):
+        load_finetuned = cfg.get("load_finetuned", False)
+        load_pretrained = cfg.get("load_pretrained", False)
+        if(load_finetuned):
+            logging.info("load fintuned blip2_llama model from {}".format(cfg.get("finetuned", None)))
+            model.load_checkpoint_from_config(cfg)
+        elif(load_pretrained):
+            logging.info("load pretrained blip2_llama model from {}".format(cfg.get("pretrained", None)))
             model.load_checkpoint_from_config(cfg)
 
         return model
