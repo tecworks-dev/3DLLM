@@ -103,25 +103,11 @@ class Blip2Llama(Blip2Base):
 
         self.max_txt_len = max_txt_len
 
-        # front_prompt + prompt + query + end_prompt + input_text
+        # front_prompt + query + prompt + end_prompt + input_text
         self.front_prompt = "以下是一个描述任务的指令，请写一个完成该指令的适当回复。\n\n ### 指令:\n"
         self.end_prompt = "\n\n### 回复:"
         self.prompt = "请描述一下这个三维点云。"
 
-
-
-        # 对预先设定的prompt进行一些处理，最终 forward 时用的输入是 query + prompt + input_text(mask 掉)
-        
-        self.prompt_tokens = self.llama_tokenizer(self.prompt, return_tensors="pt")
-        # prompt_token 会自动加一个 bos token, 所以这里要减去1
-        input_ids = self.prompt_tokens.input_ids[:, 1:]
-        self.prompt_attention_mask = self.prompt_tokens.attention_mask[:, 1:]
-        self.prompt_embedings = self.llama_model.model.embed_tokens(input_ids)
-
-        assert self.prompt_attention_mask.shape[1] == self.prompt_embedings.shape[1],  \
-                "prompt_attention_mask.shape : {} prompt_embedings.shape : {}".format(self.prompt_attention_mask.shape, self.prompt_embedings.shape)
-        self.prompt_length = self.prompt_attention_mask.sum(1)
-        logging.info("prompt {}, prompt_length : {}".format(self.prompt, self.prompt_length))
 
         # self.prompt = prompt
         # prompt_tokens = self.llama_tokenizer(self.prompt, return_tensors="pt")
@@ -152,42 +138,44 @@ class Blip2Llama(Blip2Base):
 
         self.llama_tokenizer.padding_side = "left"
 
-        # text = [t + "\n" for t in samples["text_input"]]
-        text = [self.prompt + t + "\n" for t in samples["text_input"]]
+        # 由于带了这个提问模板, 整个文字必须分成三部分去 tokenizer , 第一部分是 front_prompt ， 第二部分是 prompt + end_prompt 第三部分 input_text
+        front_text = [self.front_prompt] * image_embeds.shape[0]
+        front_token = self.llama_tokenizer(front_text, return_tensors="pt", padding="longest").to(device)
+        front_attention_mask = front_token.attention_mask
+        front_targets = (torch.ones(front_attention_mask.size(), dtype=torch.long).to(device).fill_(-100))
+        front_embeds = self.llama_model.model.embed_tokens(front_token.input_ids)
+        
 
-        llama_tokens = self.llama_tokenizer(
-            text,
-            return_tensors="pt",
-            padding="longest",
-            truncation=True,
-            max_length=self.max_txt_len,
-        ).to(device)
+        mid_text = [self.prompt + self.end_prompt] * image_embeds.shape[0]
+        mid_token = self.llama_tokenizer(mid_text, return_tensors="pt", padding="longest",
+                                         truncation=True, max_length=self.max_txt_len).to(device)
+        # llama_tokenizer 会自动在输入的文本前面加上 bos token, 所以这里要减去1
+        mid_attention_mask = mid_token.attention_mask[:, 1:]
+        mid_token.input_ids = mid_token.input_ids[:, 1:]
+        mid_targets =  (torch.ones(mid_attention_mask.size(), dtype=torch.long).to(device).fill_(-100))
+        mid_embeds = self.llama_model.model.embed_tokens(mid_token.input_ids)
 
         # llama_tokenizer 会自动在输入的文本前面加上 bos token, 所以这里要减去1
-        llama_tokens.input_ids = llama_tokens.input_ids[:, 1:]
-        llama_tokens.attention_mask = llama_tokens.attention_mask[:, 1:]
-
+        end_text = [t + "\n" for t in samples["text_input"]]
+        end_token = self.llama_tokenizer(end_text, return_tensors="pt", padding="longest",
+                                            truncation=True, max_length=self.max_txt_len).to(device)
+        end_token.input_ids = end_token.input_ids[:, 1:]
+        end_attention_mask = end_token.attention_mask[:, 1:]
         # 把padding 的位置设置为 -100, 这样就不会计算loss
-        # targets 尺寸为 [B, N]
-        targets = llama_tokens.input_ids.masked_fill(
-            llama_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
+        end_targets = end_token.input_ids.masked_fill(
+            end_token.input_ids == self.llama_tokenizer.pad_token_id, -100
         )
+        end_embeds = self.llama_model.model.embed_tokens(end_token.input_ids)
 
-        # 如果有一个固定的 prompt, 那么就把这个prompt对应的位置的  也设置为-100
-        # 有点疑惑, llama_tokens 是根据输入的文字生成的, 并不包含 self.prompt， 所以如果把前N个位置认为是self.prompt，就会导致后续出错
-        if self.prompt:
-            targets[:, : self.prompt_length] = -100  # do not apply loss to the prompt
 
         # [B, 32]
         empty_targets = (
             torch.ones(atts_llama.size(), dtype=torch.long).to(device).fill_(-100)
         )
-        # [B, 32] cat [B, N]  -> [B, 32+N]
-        targets = torch.cat([empty_targets, targets], dim=1)
-
-        inputs_embeds = self.llama_model.model.embed_tokens(llama_tokens.input_ids)
-        inputs_embeds = torch.cat([inputs_llama, inputs_embeds], dim=1)
-        attention_mask = torch.cat([atts_llama, llama_tokens.attention_mask], dim=1)
+        # front_prompt + query + prompt + end_prompt + input_text
+        targets = torch.cat([front_targets, empty_targets, mid_targets, end_targets], dim=1)    # [B, 32] cat [B, N]  -> [B, 32+N]
+        inputs_embeds = torch.cat([front_embeds, inputs_llama, mid_embeds, end_embeds], dim=1)
+        attention_mask = torch.cat([front_attention_mask, atts_llama, mid_attention_mask, end_attention_mask], dim=1)
 
         with self.maybe_autocast():
             outputs = self.llama_model(
@@ -324,8 +312,6 @@ class Blip2Llama(Blip2Base):
         max_length=30,
         min_length=1,
         top_p=0.95,
-        top_k=50,
-        no_repeat_ngram_size=6,
         repetition_penalty=1.0,
         length_penalty=1.0,
         num_captions=1,
@@ -359,54 +345,33 @@ class Blip2Llama(Blip2Base):
             else:
                 prompt = self.prompt
 
-            # 对起始的token进行处理
-            front_tokens = self.llama_tokenizer(front_prompt, return_tensors="pt").to(device)
-            front_embeds = self.llama_model.model.embed_tokens(front_tokens.input_ids)
+            # 由于带了这个提问模板, 整个文字必须分成两部分去 tokenizer , 第一部分是 front_prompt ， 第二部分是 prompt + end_prompt
+            front_text = [self.front_prompt] * image_embeds.shape[0]
+            front_token = self.llama_tokenizer(front_text, return_tensors="pt", padding="longest").to(device)
+            front_attention_mask = front_token.attention_mask
+            front_embeds = self.llama_model.model.embed_tokens(front_token.input_ids)
 
-            # 对输入的文字prompt进行处理，因为每个prompt都会添加一个 bos token, 所以需要把bos token去掉
-            prompt = [prompt] * image_embeds.size(0)
-            prompt_tokens = self.llama_tokenizer(prompt, return_tensors="pt").to(device)
-            prompt_tokens.input_ids = prompt_tokens.input_ids[:, 1:]
-            prompt_tokens.attention_mask = prompt_tokens.attention_mask[:, 1:]
-            prompt_embeds = self.llama_model.model.embed_tokens(prompt_tokens.input_ids)
-            
-
-            # 对于结尾的 token 需要额外处理, 因为每个prompt都会添加一个 bos token, 而结尾的prompt要和前面的tokenizer结果拼接起来
-            # 所以需要把结尾的prompt的bos token去掉
-            end_tokens = self.llama_tokenizer(end_prompt, return_tensors="pt").to(device)
-            end_tokens.input_ids = end_tokens.input_ids[:, 1:]
-            end_tokens.attention_mask = end_tokens.attention_mask[:, 1:]
-            end_embeds = self.llama_model.model.embed_tokens(end_tokens.input_ids)
+            end_text = [prompt + self.end_prompt] * image_embeds.shape[0]
+            end_token = self.llama_tokenizer(end_text, return_tensors="pt", padding="longest",
+                                            truncation=True, max_length=self.max_txt_len).to(device)
+            # llama_tokenizer 会自动在输入的文本前面加上 bos token, 所以这里要减去1
+            end_attention_mask = end_token.attention_mask[:, 1:]
+            end_token.input_ids = end_token.input_ids[:, 1:]
+            end_embeds = self.llama_model.model.embed_tokens(end_token.input_ids)
 
             # 最后进行拼接  front + query + prompt + end
-            input_embeds = torch.cat([front_embeds, inputs_query, prompt_embeds, end_embeds], dim=1)
-            attention_mask = torch.cat([front_tokens.attention_mask, atts_query, prompt_tokens.attention_mask, end_tokens.attention_mask], dim=1)
-
+            input_embeds = torch.cat([front_embeds, inputs_query, end_embeds], dim=1)
+            attention_mask = torch.cat([front_attention_mask, atts_query, end_attention_mask], dim=1)
 
             if use_nucleus_sampling:
                 input_embeds = input_embeds.repeat_interleave(num_captions, dim=0)
+                attention_mask = attention_mask.repeat_interleave(num_captions, dim=0)
                 num_beams = 1
             else:
                 input_embeds = input_embeds.repeat_interleave(num_beams, dim=0)
-
-
-            # generated_ids = self.llama_model.generate(
-            #     llama_tokens.input_ids,
-            #     inputs_embeds=query_embeds,
-            #     attention_mask=attention_mask,
-            #     max_new_tokens=max_length,
-            #     do_sample = use_nucleus_sampling,
-            #     num_beams = num_beams,
-            #     top_k = top_k,
-            #     top_p = top_p,
-            #     temperature = temperature,
-            #     no_repeat_ngram_size = no_repeat_ngram_size,
-            # )
-            # results = self.llama_tokenizer.batch_decode(generated_ids, skip_special_tokens=True, spaces_between_special_tokens=False)
-            # return results
+                attention_mask = attention_mask.repeat_interleave(num_beams, dim=0)
 
             outputs = self.llama_model.generate(
-                # input_ids=input_ids,
                 inputs_embeds=input_embeds,
                 attention_mask=attention_mask,
                 do_sample=use_nucleus_sampling,
