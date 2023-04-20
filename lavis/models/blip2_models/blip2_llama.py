@@ -102,8 +102,16 @@ class Blip2Llama(Blip2Base):
         )
 
         self.max_txt_len = max_txt_len
-        # 对预先设定的prompt进行一些处理，最终 forward 时用的输入是 query + prompt + input_text(mask 掉)
+
+        # front_prompt + prompt + query + end_prompt + input_text
+        self.front_prompt = "以下是一个描述任务的指令，请写一个完成该指令的适当回复。\n\n ### 指令:\n"
+        self.end_prompt = "\n\n### 回复:"
         self.prompt = "请描述一下这个三维点云。"
+
+
+
+        # 对预先设定的prompt进行一些处理，最终 forward 时用的输入是 query + prompt + input_text(mask 掉)
+        
         self.prompt_tokens = self.llama_tokenizer(self.prompt, return_tensors="pt")
         # prompt_token 会自动加一个 bos token, 所以这里要减去1
         input_ids = self.prompt_tokens.input_ids[:, 1:]
