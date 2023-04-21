@@ -22,6 +22,11 @@ def load_point_cloud(path:str) -> Dict[str, torch.Tensor]:
     # cloud = torch.zeros((2048, 3))
     #TODO: 以后需要完成关于不同格式的点云的读取，目前torch.load应该只能读取pth格式的点云
     cloud = torch.load(path)
+    if(isinstance(cloud, tuple)):
+        cloud = {"coord": cloud[0], "color": cloud[1], "semantic_gt": cloud[2]}
+        cloud["color"] = ((cloud["color"] + 1) * 127.5).astype(np.uint8)
+        cloud["color"] = cloud["color"].astype(np.float64)
+        cloud["coord"] = cloud["coord"].astype(np.float64)
     "coord" "color" "semantic_gt"
     if "semantic_gt" in cloud.keys():
         cloud["semantic_gt"] = cloud["semantic_gt"].reshape([-1])
