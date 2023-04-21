@@ -48,9 +48,9 @@ class Blip2Llama(Blip2Base):
     ):
         super().__init__()
 
-        # self.tokenizer = self.init_tokenizer()
-
-        
+        # 有时候会开好几个terminal，每个里面都运行了一个Blip2llama，为了区分它们，就用一个路径来区分
+        self.model_path = None
+     
         self.cloud_encoder, self.ln_cloud = self.init_cloud_encoder(
             point_cloud_encoder_model, max_cloud_size, drop_path_rate, use_grad_checkpoint, point_cloud_encoder_pretrain_model_path
         )
@@ -62,7 +62,6 @@ class Blip2Llama(Blip2Base):
             logging.info("freeze point cloud encoder")
 
         self.num_query_token = num_query_token
-        # TODO : 不要固定为384 需要根据point cloud encoder的输出来确定
         self.Qformer, self.query_tokens = self.init_Qformer(
             self.num_query_token, self.cloud_encoder.enc_channels[-1], encoder_layer=qformer_encoder_layer
         )
@@ -76,10 +75,6 @@ class Blip2Llama(Blip2Base):
             layer.intermediate = None
 
         t1 = time.time()
-        # 张老师的学生提供的 llama 读取代码
-        # config = llama.LLaMAConfig.from_pretrained(llama_model_path)
-        # self.llama_tokenizer = llama.LLaMATokenizer.from_pretrained(llama_model_path)
-        # self.llama_model = llama.LLaMAForCausalLM.from_pretrained(llama_model_path, torch_dtype=torch.float16, config=config, state_dict=None)
         # transformers 的读取代码
         self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_model_path, use_fast=False)
         self.llama_model = LlamaForCausalLM.from_pretrained(llama_model_path, torch_dtype=torch.float16)
@@ -112,6 +107,17 @@ class Blip2Llama(Blip2Base):
         # self.prompt = prompt
         # prompt_tokens = self.llama_tokenizer(self.prompt, return_tensors="pt")
         # self.prompt_length = prompt_tokens.attention_mask.sum(1)
+
+    def set_model_path(self, path:str):
+        self.model_path = path
+
+    def reload_from_checkpoint(self, num_qformer_layer:int,checkpoint_path:str):
+        del self.Qformer, self.query_tokens
+        self.Qformer, self.query_tokens = self.init_Qformer(
+            self.num_query_token, self.cloud_encoder.enc_channels[-1], encoder_layer=num_qformer_layer
+        )
+        self.load_checkpoint(checkpoint_path)
+        self.set_model_path(checkpoint_path)
 
     def forward(self, samples):
         image = samples["cloud"]
@@ -147,8 +153,7 @@ class Blip2Llama(Blip2Base):
         
 
         mid_text = [self.prompt + self.end_prompt] * image_embeds.shape[0]
-        mid_token = self.llama_tokenizer(mid_text, return_tensors="pt", padding="longest",
-                                         truncation=True, max_length=self.max_txt_len).to(device)
+        mid_token = self.llama_tokenizer(mid_text, return_tensors="pt", padding="longest").to(device)
         # llama_tokenizer 会自动在输入的文本前面加上 bos token, 所以这里要减去1
         mid_attention_mask = mid_token.attention_mask[:, 1:]
         mid_token.input_ids = mid_token.input_ids[:, 1:]
@@ -299,7 +304,7 @@ class Blip2Llama(Blip2Base):
             output_text = self.llama_tokenizer.batch_decode(
                 outputs[:, prompt_length:], skip_special_tokens=True
             )
-            output_text = [text.strip() for text in output_text]
+            output_text = [text.strip().replace(" ", "") for text in output_text]
             return output_text
 
 
@@ -317,8 +322,6 @@ class Blip2Llama(Blip2Base):
         num_captions=1,
         temperature=0.7,
     ):
-        front_prompt = "以下是一个描述任务的指令，请写一个完成该指令的适当回复。\n\n ### 指令:\n"
-        end_prompt = "\n\n### 回复:"
         image = samples["cloud"]
         device = image["coord"].device
         with self.maybe_autocast():
@@ -427,8 +430,10 @@ class Blip2Llama(Blip2Base):
         if(load_finetuned):
             logging.info("load fintuned blip2_llama model from {}".format(cfg.get("finetuned", None)))
             model.load_checkpoint_from_config(cfg)
+            model.set_model_path(cfg.get("finetuned", None))
         elif(load_pretrained):
             logging.info("load pretrained blip2_llama model from {}".format(cfg.get("pretrained", None)))
             model.load_checkpoint_from_config(cfg)
+            model.set_model_path(cfg.get("pretrained", None))
 
         return model
