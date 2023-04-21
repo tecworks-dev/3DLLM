@@ -27,7 +27,13 @@ def load_point_cloud(path:str) -> Dict[str, torch.Tensor]:
         cloud["color"] = ((cloud["color"] + 1) * 127.5).astype(np.uint8)
         cloud["color"] = cloud["color"].astype(np.float64)
         cloud["coord"] = cloud["coord"].astype(np.float64)
-    "coord" "color" "semantic_gt"
+        # 把 coord 中的值归一化到 [-5, 5] 之间
+        max_value = np.max(cloud["coord"])
+        min_value = np.min(cloud["coord"])
+        final_value = max(abs(max_value), abs(min_value))
+        cloud["coord"] = cloud["coord"] / final_value  * 5.0
+
+    # "coord" "color" "semantic_gt"
     if "semantic_gt" in cloud.keys():
         cloud["semantic_gt"] = cloud["semantic_gt"].reshape([-1])
         cloud["semantic_gt"] = cloud["semantic_gt"].astype(np.int64)
