@@ -12,6 +12,7 @@ from PIL import Image
 from typing import List, Tuple, Dict
 import json
 import numpy as np
+import logging
 
 def load_point_cloud(path:str) -> Dict[str, torch.Tensor]:
     """
@@ -19,9 +20,12 @@ def load_point_cloud(path:str) -> Dict[str, torch.Tensor]:
     path: 点云路径,绝对路径
     return: 点云, shape: (N, 3)
     """
-    # cloud = torch.zeros((2048, 3))
     #TODO: 以后需要完成关于不同格式的点云的读取，目前torch.load应该只能读取pth格式的点云
-    cloud = torch.load(path)
+    try:
+        cloud = torch.load(path)
+    except:
+        raise KeyError("Error: Can't load point cloud from {}".format(path))
+    # 这是为了处理我之前保存的点云的格式, 理论上应该保存为字典，但我实际存的是元组
     if(isinstance(cloud, tuple)):
         cloud = {"coord": cloud[0], "color": cloud[1], "semantic_gt": cloud[2]}
         cloud["color"] = ((cloud["color"] + 1) * 127.5).astype(np.uint8)
@@ -42,16 +46,26 @@ def load_point_cloud(path:str) -> Dict[str, torch.Tensor]:
 
 def load_pairs(path:str) -> List[Tuple[str, str]]:
     """
-    从文件中读取点云和对应的caption
-    path: 文件路径, 绝对路径
-    return: List[List[str, str]], 每个元素是一个List, 第一个元素是点云路径, 第二个元素是对应的caption
+    从文件中读取点云和对应的caption, 以及可能存在的prompt
+    输入的文件格式为json,具体实例如下:
+    "path/to/pointcloud1.pth": ["This is caption 1", "This is prompt 1"], 
+    "path/to/pointcloud2.pth": ["This is caption 2", "This is prompt 2"]
+    "path/to/pointcloud3.pth": ["This is caption 3"]
+    "path/to/pointcloud4.pth": "This is caption 4"
+    
+    path: 文件路径, 这是一个绝对路径
+    return: List[List[str, str, str]], 每个元素是一个List, 第一个元素是点云路径, 第二个元素是对应的caption, 第三个元素是prompt(如果存在的话)
     """
     pairs = []
     with open(path, "r") as f:
         init_pairs = json.load(f)
         for key in init_pairs:
-            pairs.append([key, init_pairs[key]])
-    
+            if isinstance(init_pairs[key], str):
+                pairs.append([key, init_pairs[key]])
+            elif isinstance(init_pairs[key], list):
+                pairs.append([key] + init_pairs[key])
+            else:
+                raise ValueError("Error: The value of key {} is not str or list".format(key))
     return pairs
 
 # 虽然这里继承了 BaseDataset, 但这个类覆写了__getitem__和__len__方法, 这里继承的主要目的是之后dataloader建立的时候不报错
@@ -83,7 +97,10 @@ class CloudTextPairDataset(BaseDataset):
         cloud = self.vis_processor(cloud)
         caption = self.text_processor(caption)
 
-        return {"cloud": cloud, "text_input": caption, "cloud_path": pair[0]}
+        data =  {"cloud": cloud, "text_input": caption, "cloud_path": pair[0]}
+        if(len(pair) > 2):
+            data["prompt"] = pair[2]
+        return data
 
         image = torch.ones((3, 224, 224))
 

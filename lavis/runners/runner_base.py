@@ -418,6 +418,7 @@ class RunnerBase:
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logging.info("Training time {}".format(total_time_str))
+        self.log_stats({"total_time": total_time_str}, split_name="other")
 
     def evaluate(self, cur_epoch="best", skip_reload=False):
         test_logs = dict()
@@ -645,11 +646,11 @@ class RunnerBase:
         if isinstance(stats, dict):
             log_stats = {**{f"{split_name}_{k}": v for k, v in stats.items()}}
             with open(os.path.join(self.output_dir, "log.txt"), "a") as f:
-                f.write(json.dumps(log_stats) + "\n")
+                f.write(json.dumps(log_stats, ensure_ascii=False) + "\n")
         elif isinstance(stats, list):
             pass
 
     @main_process
     def log_config(self):
         with open(os.path.join(self.output_dir, "log.txt"), "a") as f:
-            f.write(json.dumps(self.config.to_dict(), indent=4) + "\n")
+            f.write(json.dumps(self.config.to_dict(), indent=4, ensure_ascii=False) + "\n")
