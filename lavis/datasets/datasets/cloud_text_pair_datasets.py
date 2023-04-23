@@ -11,6 +11,7 @@ from lavis.datasets.datasets.base_dataset import BaseDataset
 from PIL import Image
 from typing import List, Tuple, Dict
 import json
+import numpy as np
 
 def load_point_cloud(path:str) -> Dict[str, torch.Tensor]:
     """
@@ -21,6 +22,22 @@ def load_point_cloud(path:str) -> Dict[str, torch.Tensor]:
     # cloud = torch.zeros((2048, 3))
     #TODO: 以后需要完成关于不同格式的点云的读取，目前torch.load应该只能读取pth格式的点云
     cloud = torch.load(path)
+    if(isinstance(cloud, tuple)):
+        cloud = {"coord": cloud[0], "color": cloud[1], "semantic_gt": cloud[2]}
+        cloud["color"] = ((cloud["color"] + 1) * 127.5).astype(np.uint8)
+        cloud["color"] = cloud["color"].astype(np.float64)
+        cloud["coord"] = cloud["coord"].astype(np.float64)
+        # 把 coord 中的值归一化到 [-5, 5] 之间
+        max_value = np.max(cloud["coord"])
+        min_value = np.min(cloud["coord"])
+        final_value = max(abs(max_value), abs(min_value))
+        cloud["coord"] = cloud["coord"] / final_value  * 5.0
+
+    # "coord" "color" "semantic_gt"
+    if "semantic_gt" in cloud.keys():
+        cloud["semantic_gt"] = cloud["semantic_gt"].reshape([-1])
+        cloud["semantic_gt"] = cloud["semantic_gt"].astype(np.int64)
+        
     return cloud
 
 def load_pairs(path:str) -> List[Tuple[str, str]]:

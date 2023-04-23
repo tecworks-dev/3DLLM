@@ -45,6 +45,7 @@ def parse_args():
         "in xxx=yyy format will be merged into config file (deprecate), "
         "change to --cfg-options instead.",
     )
+    parser.add_argument("--job_id", type=str, default=None, help="job id")
 
     args = parser.parse_args()
     # if 'LOCAL_RANK' not in os.environ:
@@ -77,10 +78,12 @@ def main():
     # allow auto-dl completes on main process without timeout when using NCCL backend.
     # os.environ["NCCL_BLOCKING_WAIT"] = "1"
 
+    args = parse_args()
     # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
-    job_id = now()
+    job_id = now() if args.job_id is None else args.job_id
 
-    cfg = Config(parse_args())
+
+    cfg = Config(args)
 
     init_distributed_mode(cfg.run_cfg)
 

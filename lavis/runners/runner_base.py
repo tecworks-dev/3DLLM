@@ -395,6 +395,9 @@ class RunnerBase:
 
                             val_log.update({"best_epoch": best_epoch})
                             self.log_stats(val_log, split_name)
+                            # 即使有了验证集，也只在每2个epoch保存一次模型
+                            if(cur_epoch % 2 == 0):
+                                self._save_checkpoint(cur_epoch, is_best=False)
 
             else:
                 # if no validation split is provided, we just save the checkpoint at the end of each epoch.

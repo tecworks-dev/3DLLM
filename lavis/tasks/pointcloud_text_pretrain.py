@@ -10,6 +10,7 @@ from lavis.common.dist_utils import get_rank, get_world_size, is_main_process, i
 from lavis.common.logger import MetricLogger
 from lavis.datasets.data_utils import prepare_sample
 from typing import Dict, List, Tuple
+import logging
 
 @registry.register_task("pointcloud_text_pretrain")
 class PointCloudTextPretrainTask(BaseTask):
@@ -94,11 +95,15 @@ class PointCloudTextPretrainTaskStage2(BaseTask):
         for samples in metric_logger.log_every(range(total_steps), print_freq, header):
             samples = next(data_loader)
             samples = prepare_sample(samples, cuda_enabled=cuda_enabled)
+            # 每一次经过 point transformer 后, 点云都会被拉直成一个向量, 因此需要把这个点云复制一份, 留到后面生成文本用
+            samples_copy = samples.copy()
             result = {"loss": 0, "text": []}
             if "text_input" in samples:
                 with torch.cuda.amp.autocast(enabled=True):
                     result["loss"] = model(samples)["loss"]
 
+            samples = samples_copy.copy()
+            logging.info(samples["coord"].shape)
             output = model.generate(samples)
             result["text"] = output
           

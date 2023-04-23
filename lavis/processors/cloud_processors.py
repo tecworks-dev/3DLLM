@@ -17,6 +17,7 @@ import torch
 from collections.abc import Sequence, Mapping
 import copy
 import random
+import logging
 
 
 
@@ -544,6 +545,7 @@ class CloudTrainProcessor(BaseProcessor):
     def __init__(self, max_size:int):
         super().__init__()
         self.max_size = max_size
+        logging.info("cloud max size: {}".format(self.max_size))
 
     # TODO 对点云进行裁剪, 降采样, 数据增强等等
     def __call__(self, point_cloud):
@@ -567,7 +569,7 @@ class CloudTrainProcessor(BaseProcessor):
         pcd_dict = RandomScale(scale=[0.9, 1.1])(pcd_dict)
         pcd_dict = RandomFlip(p=0.5)(pcd_dict)
         pcd_dict = RandomJitter(sigma=0.005, clip=0.02)(pcd_dict)
-        pcd_dict = ElasticDistortion(distortion_params=[[0.2, 0.4], [0.8, 1.6]])(pcd_dict)
+        # pcd_dict = ElasticDistortion(distortion_params=[[0.2, 0.4], [0.8, 1.6]])(pcd_dict)
         pcd_dict = ChromaticAutoContrast(p=0.2, blend_factor=None)(pcd_dict)
         pcd_dict = ChromaticTranslation(p=0.95, ratio=0.05)(pcd_dict)
         pcd_dict = ChromaticJitter(p=0.95, std=0.05)(pcd_dict)        
