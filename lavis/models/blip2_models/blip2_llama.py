@@ -16,10 +16,11 @@ import torch.nn as nn
 
 from lavis.common.registry import registry
 from lavis.models.blip2_models.blip2 import Blip2Base, disabled_train
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModel
 # import lavis.models.blip2_models.llama as llama
 from transformers import LlamaConfig, LlamaModel, LlamaForCausalLM
 import time
+from typing import List
 
 @registry.register_model("blip2_llama")
 class Blip2Llama(Blip2Base):
@@ -41,7 +42,7 @@ class Blip2Llama(Blip2Base):
         max_cloud_size = 10000,
         num_query_token=32,
         llama_model_path="",
-        prompt="",
+        prompt=None,
         max_txt_len=32,
         qformer_encoder_layer=12,
         point_cloud_encoder_pretrain_model_path = None,
@@ -50,6 +51,10 @@ class Blip2Llama(Blip2Base):
 
         # 有时候会开好几个terminal，每个里面都运行了一个Blip2llama，为了区分它们，就用一个路径来区分
         self.model_path = None
+
+        self.bert_tokenizer = None
+        self.bert_model = None
+        self.sim_threshold = 0.8
      
         self.cloud_encoder, self.ln_cloud = self.init_cloud_encoder(
             point_cloud_encoder_model, max_cloud_size, drop_path_rate, use_grad_checkpoint, point_cloud_encoder_pretrain_model_path
@@ -98,10 +103,23 @@ class Blip2Llama(Blip2Base):
 
         self.max_txt_len = max_txt_len
 
+        # 对于prompt的优先级设定：
+        # 1. 如果输入的数据中自带prompt，那么就用自带的prompt，每条数据自带的prompt可以不同
+        # 2. 如果输入的数据中没有prompt，那么就用模型的默认prompt，每条数据都用同一个prompt
+        # 3. 模型默认的prompt是在模型构造的时候作为参数传入的，如果没有传入参数，那么就用程序中预先设置好的一句话
         # front_prompt + query + prompt + end_prompt + input_text
         self.front_prompt = "以下是一个描述任务的指令，请写一个完成该指令的适当回复。\n\n ### 指令:\n"
         self.end_prompt = "\n\n### 回复:"
-        self.prompt = "请描述一下这个三维点云。"
+        if prompt is None:
+            # self.prompt = "请描述一下这个三维点云。"
+            self.prompt = "请描述一下这个三维场景的结构布局。"
+        else:
+            self.prompt = prompt
+
+        logging.info("front_prompt: " + self.front_prompt)
+        logging.info("end_prompt: " + self.end_prompt)
+        logging.info("prompt: " + self.prompt)
+
 
 
         # self.prompt = prompt
@@ -118,6 +136,50 @@ class Blip2Llama(Blip2Base):
         )
         self.load_checkpoint(checkpoint_path)
         self.set_model_path(checkpoint_path)
+
+    def comupte_simililiarity(self, text:List[str], device)->float:
+        if(len(text) <= 1):
+            return 0.0
+        # 用于后处理生成的文字的参数
+        if(self.bert_model is None):
+            logging.info("load bert model")
+            self.bert_tokenizer = AutoTokenizer.from_pretrained("/public/public_data/3DLLM/pretrained_model/bert-base-chinese/")
+            self.bert_model = AutoModel.from_pretrained("/public/public_data/3DLLM/pretrained_model/bert-base-chinese/")
+        
+        # 找到最短的句子的长度
+        min_len = min([len(t) for t in text])
+        inputs = self.bert_tokenizer(text, max_length=min_len, truncation=True, return_tensors="pt")
+        inputs = inputs.to(device)
+        with torch.no_grad():
+            outputs = self.bert_model(**inputs)
+            text_vec1 = outputs.last_hidden_state[0, 0, :]
+            text_vec2 = outputs.last_hidden_state[1, 0, :]
+            simililarity = torch.cosine_similarity(text_vec1, text_vec2, dim=0)
+        return simililarity.item()
+
+    def postprocess_text(self, text:List[str], device):
+        output = []
+        # 把所有句子按照句号分割
+        text_split = [t.split("。") for t in text]
+        for split_each_text in text_split:
+            # 如果只分割出来一个句子，那么就直接加入到输出中
+            if(len(split_each_text) <= 1):
+                output.append(split_each_text[0])
+                continue
+            # 如果有多个句子，那么就匹配连续两个句子的相似度 
+            reference_id = 0
+            available_split = [split_each_text[0]]      # 用来存储可用的句子，第一句肯定是可用的
+            for curr_id in range(1, len(split_each_text)):
+                # 如果当前句子长度小于等于1，那么就跳过, 因为这种句子不是完整的句子或者就是一个标点符号甚至是空字符串
+                if(len(split_each_text[curr_id]) <= 1):
+                    continue
+                sim = self.comupte_simililiarity([split_each_text[reference_id], split_each_text[curr_id]], device)
+                if sim <= self.sim_threshold:
+                    available_split.append(split_each_text[curr_id])
+                    reference_id = curr_id
+            output.append("。".join(available_split))
+        return output
+
 
     def forward(self, samples):
         image = samples["cloud"]
@@ -152,7 +214,14 @@ class Blip2Llama(Blip2Base):
         front_embeds = self.llama_model.model.embed_tokens(front_token.input_ids)
         
 
-        mid_text = [self.prompt + self.end_prompt] * image_embeds.shape[0]
+        # 如果输入的数据中自带prompt，那么就用自带的prompt，每条数据自带的prompt可以不同
+        # 如果输入的数据中没有prompt，那么就用模型的默认prompt，每条数据都用同一个prompt
+        if "prompt" in samples:
+            prompt = samples["prompt"]
+            mid_text = [p + self.end_prompt for p in prompt]
+        else:
+            mid_text = [self.prompt + self.end_prompt] * image_embeds.shape[0]
+        
         mid_token = self.llama_tokenizer(mid_text, return_tensors="pt", padding="longest").to(device)
         # llama_tokenizer 会自动在输入的文本前面加上 bos token, 所以这里要减去1
         mid_attention_mask = mid_token.attention_mask[:, 1:]
@@ -206,7 +275,7 @@ class Blip2Llama(Blip2Base):
         max_length=30,
         min_length=1,
         top_p=0.95,
-        top_k=50,
+        max_sentences=2,
         no_repeat_ngram_size=6,
         repetition_penalty=1.0,
         length_penalty=1.0,
@@ -227,6 +296,7 @@ class Blip2Llama(Blip2Base):
             top_p (float): The cumulative probability for nucleus sampling.
             repetition_penalty (float): The parameter for repetition penalty. 1.0 means no penalty.
             num_captions (int): Number of captions to be generated for each image.
+            max_sentences(int): The maximum number of sentences to be generated.
         Returns:
             captions (list): A list of strings of length batch_size * num_captions.
         """
@@ -305,6 +375,7 @@ class Blip2Llama(Blip2Base):
                 outputs[:, prompt_length:], skip_special_tokens=True
             )
             output_text = [text.strip().replace(" ", "") for text in output_text]
+            # output_text = self.postprocess_text(output_text, device = device)
             return output_text
 
 
@@ -393,6 +464,7 @@ class Blip2Llama(Blip2Base):
                 outputs, skip_special_tokens=True, spaces_between_special_tokens=False
             )
             output_text = [text.strip() for text in output_text]
+            # output_text = self.postprocess_text(output_text, device = device)
             return output_text
         
 
@@ -403,7 +475,7 @@ class Blip2Llama(Blip2Base):
         drop_path_rate = cfg.get("drop_path_rate", 0)
         use_grad_checkpoint = cfg.get("use_grad_checkpoint", False)
 
-        prompt = cfg.get("prompt", "")
+        prompt = cfg.get("prompt", None)
         max_txt_len = cfg.get("max_txt_len", 32)
 
         pritrained_llama_model_path = cfg.get("pretrained_llama_path", "")
