@@ -143,8 +143,14 @@ class Blip2Llama(Blip2Base):
         # 用于后处理生成的文字的参数
         if(self.bert_model is None):
             logging.info("load bert model")
-            self.bert_tokenizer = AutoTokenizer.from_pretrained("/public/public_data/3DLLM/pretrained_model/bert-base-chinese/")
-            self.bert_model = AutoModel.from_pretrained("/public/public_data/3DLLM/pretrained_model/bert-base-chinese/")
+            # self.bert_tokenizer = AutoTokenizer.from_pretrained("/public/public_data/3DLLM/pretrained_model/bert-base-chinese/")
+            # self.bert_model = AutoModel.from_pretrained("/public/public_data/3DLLM/pretrained_model/bert-base-chinese/")
+            # 不知道为什么, 从文件读取的bert模型有问题, 但文件里的bert模型就是先用以下方式得到, 然后保存的
+            self.bert_tokenizer = AutoTokenizer.from_pretrained("bert-base-chinese")
+            self.bert_model = AutoModel.from_pretrained("bert-base-chinese")
+
+            self.bert_model.to(device)
+            self.bert_model.eval()
         
         # 找到最短的句子的长度
         min_len = min([len(t) for t in text])
@@ -387,6 +393,7 @@ class Blip2Llama(Blip2Base):
         num_beams=1,
         max_length=30,
         min_length=1,
+        max_sentences=-1,
         top_p=0.95,
         repetition_penalty=1.0,
         length_penalty=1.0,
@@ -464,6 +471,10 @@ class Blip2Llama(Blip2Base):
                 outputs, skip_special_tokens=True, spaces_between_special_tokens=False
             )
             output_text = [text.strip() for text in output_text]
+            if(max_sentences > 0):
+                for i in range(0, len(output_text)):
+                    text_split = output_text[i].split("。")
+                    output_text[i] = "。".join(text_split[:max_sentences]) if len(text_split) > max_sentences else output_text[i]
             # output_text = self.postprocess_text(output_text, device = device)
             return output_text
         
