@@ -7,7 +7,7 @@ from lavis.models import load_model_and_preprocess
 from lavis.common.registry import registry
 from flask import request
 from flask_api import FlaskAPI
-from typing import Dict
+from typing import Dict, List
 import numpy as np
 import plyfile
 
@@ -79,6 +79,26 @@ def to_device(data, device):
         return [to_device(v, device) for v in data]
     else:
         return data
+    
+def post_process(text_list:List[str], max_sentences:int = 2) -> List[str]:
+    processed_text = []
+    for text in text_list:
+        text = text.replace("\n", "")       # 去掉换行符
+        text = text.replace(" ", "")        # 去掉空格
+        text_split = text.split("。")       # 按照句号分割
+        # 如果只分割出一句话，说明这一段话中一个句号都没有，那么就按照逗号分割，
+        # 并且只保留最后一个逗号之前的内容，如果连逗号都没有，那么我就无能为力了，这种情况下函数会直接返回空列表
+        if len(text_split) == 1: 
+            text_split = text.split("，")
+            text_split = text_split[:-1]
+            text_split = "，".join(text_split)
+        else:
+            text_split = text_split[:-1]
+            text_split = text_split[:max_sentences] if len(text_split) > max_sentences else text_split
+            text_split = "。".join(text_split)
+        processed_text.append(text_split + "。")
+    return processed_text
+
 '''
 传入的POST需要包含以下几项内容:
 cloud_path : 点云的绝对路径
@@ -91,7 +111,6 @@ def caption():
     global device, model, vis_processors
     if(request.method == 'POST'):
         data = request.data
-        result = {"data_keys": list(data.keys())}
         if "cloud_path" not in data:
             return {"error": "cloud_path not found"}, 400
         cloud_path = data["cloud_path"]
@@ -107,10 +126,11 @@ def caption():
                 cloud[k] = cloud[k].to(device)
                 cloud[k] = cloud[k].unsqueeze(0)
 
-        result = model.generate_with_hidden_prompt({"cloud":cloud, "text_input": prompt}, max_length=max_length, num_beams=1, max_sentences = max_sentences)
-        # print(result)
-        return {"answer": result}
-        return result
+        result = model.generate_with_hidden_prompt({"cloud":cloud, "text_input": prompt}, max_length=max_length, num_beams=1)
+        result_processed = post_process(result, max_sentences=max_sentences)
+        # 把结果和输入的数据一起返回
+        return {"answer": result_processed, "init_answer": result}.update(data)
+ 
     elif(request.method == 'GET'):
         return {"error": "nothing to GET"}
 

@@ -345,21 +345,6 @@ class Blip2Llama(Blip2Base):
                 query_embeds = input_embeds.repeat_interleave(num_beams, dim=0)
 
 
-            # generated_ids = self.llama_model.generate(
-            #     llama_tokens.input_ids,
-            #     inputs_embeds=query_embeds,
-            #     attention_mask=attention_mask,
-            #     max_new_tokens=max_length,
-            #     do_sample = use_nucleus_sampling,
-            #     num_beams = num_beams,
-            #     top_k = top_k,
-            #     top_p = top_p,
-            #     temperature = temperature,
-            #     no_repeat_ngram_size = no_repeat_ngram_size,
-            # )
-            # results = self.llama_tokenizer.batch_decode(generated_ids, skip_special_tokens=True, spaces_between_special_tokens=False)
-            # return results
-
             outputs = self.llama_model.generate(
                 # input_ids=input_ids,
                 inputs_embeds=query_embeds,
@@ -393,7 +378,6 @@ class Blip2Llama(Blip2Base):
         num_beams=1,
         max_length=30,
         min_length=1,
-        max_sentences=-1,
         top_p=0.95,
         repetition_penalty=1.0,
         length_penalty=1.0,
@@ -471,14 +455,7 @@ class Blip2Llama(Blip2Base):
                 outputs, skip_special_tokens=True, spaces_between_special_tokens=False
             )
             output_text = [text.strip() for text in output_text]
-            if(max_sentences > 0):
-                for i in range(0, len(output_text)):
-                    text_split = output_text[i].split("。")
-                    if(len(text_split) > max_sentences):
-                        output_text[i] = "。".join(text_split[:max_sentences])
-                    else:
-                        output_text[i] = "。".join(text_split[:-1])
-                    output_text[i] = output_text[i] + "。"
+            
             # output_text = self.postprocess_text(output_text, device = device)
             return output_text
         
