@@ -474,7 +474,11 @@ class Blip2Llama(Blip2Base):
             if(max_sentences > 0):
                 for i in range(0, len(output_text)):
                     text_split = output_text[i].split("。")
-                    output_text[i] = "。".join(text_split[:max_sentences]) if len(text_split) > max_sentences else output_text[i]
+                    if(len(text_split) > max_sentences):
+                        output_text[i] = "。".join(text_split[:max_sentences])
+                    else:
+                        output_text[i] = "。".join(text_split[:-1])
+                    output_text[i] = output_text[i] + "。"
             # output_text = self.postprocess_text(output_text, device = device)
             return output_text
         

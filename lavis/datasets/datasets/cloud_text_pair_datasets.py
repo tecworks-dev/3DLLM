@@ -19,10 +19,8 @@ def load_point_cloud(path:str) -> Dict[str, torch.Tensor]:
     """
     从文件中读取点云
     path: 点云路径,绝对路径
-    return: 点云, shape: (N, 3)
+    return: 点云, 字典类型, 包含 "coord", "color", "semantic_gt" 三个key
     """
-    # cloud = torch.zeros((2048, 3))
-    #TODO: 以后需要完成关于不同格式的点云的读取，目前torch.load应该只能读取pth格式的点云
     file_type = path.split(".")[-1]
     if file_type == "pth":
         cloud = torch.load(path)
